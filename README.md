@@ -1,5 +1,9 @@
 # 鼠鼠实习妙妙工具
 
+<p align="center">
+  <img src="assets/logo.svg" alt="鼠鼠实习妙妙工具 Logo" width="400">
+</p>
+
 ![Version](https://img.shields.io/badge/version-v1.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Audience](https://img.shields.io/badge/audience-CS%20Internship-orange)
@@ -9,7 +13,7 @@
 
 
 
-鼠鼠实习妙妙工具是一个实习项目准备工具包：把目标 JD（Job Description，岗位描述/招聘需求）快速转成能投递、能面试、能讲清的项目素材闭环。这里的 JD 通常包括岗位职责、任职要求、技术栈、业务方向、地点、学历/毕业时间限制等信息。
+鼠鼠实习妙妙工具是一个AI驱动的实习项目准备工具包（skill）：把目标 JD（Job Description，岗位描述/招聘需求）快速转成能投递、能面试、能讲清的项目素材闭环。这里的 JD 通常包括岗位职责、任职要求、技术栈、业务方向、地点、学历/毕业时间限制等信息。
 
 它适合后端、前端、全栈、移动端、测试开发、数据工程、云原生/DevOps、安全、系统、AI/算法等计算机方向，旨在帮 0 经验或低经验候选人（鼠鼠）用最短路径完成：选题、理解、复现、简历表达、面试拷问和展示材料。
 
