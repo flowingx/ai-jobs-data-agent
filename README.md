@@ -4,10 +4,14 @@
   <img src="assets/logo.svg" alt="鼠鼠实习妙妙工具 Logo" width="400">
 </p>
 
-![Version](https://img.shields.io/badge/version-v1.0.0-brightgreen)
-![License](https://img.shields.io/badge/license-Apache--2.0-blue)
-![Audience](https://img.shields.io/badge/audience-CS%20Internship-orange)
-![Workflow](https://img.shields.io/badge/workflow-Job%20Description%20to%20Interview-purple)
+<h2 align="center">SIT —— shushu internship tool</h2>
+
+<p align="center">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.0-brightgreen">
+  <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
+  <img alt="Audience" src="https://img.shields.io/badge/audience-CS%20Internship-orange">
+  <img alt="Workflow" src="https://img.shields.io/badge/workflow-Job%20Description%20to%20Interview-purple">
+</p>
 
 > 把岗位描述变项目，把项目变简历，把简历变面试。
 

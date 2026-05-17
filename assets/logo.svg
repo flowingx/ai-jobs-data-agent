@@ -1,65 +1,50 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500" role="img" aria-label="Shushu Internship Tool Logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" role="img" aria-label="SIT shushu internship tool logo">
   <defs>
-    <linearGradient id="mouseBodyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4facfe"/>
-      <stop offset="100%" stop-color="#00f2fe"/>
+    <linearGradient id="furGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#A78BFA"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
     </linearGradient>
-
-    <linearGradient id="earGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ff9a9e"/>
-      <stop offset="100%" stop-color="#fecfef"/>
+    <linearGradient id="laptopGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F3F4F6"/>
+      <stop offset="100%" stop-color="#9CA3AF"/>
     </linearGradient>
-
-    <linearGradient id="toolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f6d365"/>
-      <stop offset="100%" stop-color="#fda085"/>
-    </linearGradient>
-
-    <filter id="dropShadow" x="-10%" y="-10%" width="130%" height="130%">
-      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#000000" flood-opacity="0.15"/>
-    </filter>
   </defs>
 
-  <rect width="500" height="500" rx="28" fill="#ffffff"/>
-  <circle cx="250" cy="230" r="180" fill="#e0f7fa" opacity="0.5"/>
+  <rect width="400" height="400" rx="28" fill="#FFFFFF"/>
+  <path d="M200 350C100 350 40 280 80 180C120 80 280 80 320 180C360 280 300 350 200 350Z" fill="#EDE9FE" opacity="0.6"/>
+  <ellipse cx="200" cy="330" rx="100" ry="15" fill="#C4B5FD" opacity="0.8"/>
 
-  <g filter="url(#dropShadow)">
-    <path d="M150 350 Q150 200 250 200 Q350 200 350 350 Z" fill="url(#mouseBodyGradient)"/>
+  <g transform="translate(0, -10)">
+    <circle cx="120" cy="130" r="45" fill="url(#furGrad1)"/>
+    <circle cx="120" cy="130" r="25" fill="#FBCFE8"/>
+    <circle cx="280" cy="130" r="45" fill="url(#furGrad1)"/>
+    <circle cx="280" cy="130" r="25" fill="#FBCFE8"/>
 
-    <circle cx="250" cy="220" r="70" fill="url(#mouseBodyGradient)"/>
+    <rect x="110" y="120" width="180" height="200" rx="90" fill="url(#furGrad1)"/>
+    <rect x="130" y="180" width="140" height="130" rx="70" fill="#FDF4FF"/>
 
-    <circle cx="180" cy="160" r="40" fill="url(#mouseBodyGradient)"/>
-    <circle cx="180" cy="160" r="25" fill="url(#earGradient)"/>
+    <rect x="135" y="160" width="55" height="55" rx="15" fill="none" stroke="#4C1D95" stroke-width="8"/>
+    <rect x="210" y="160" width="55" height="55" rx="15" fill="none" stroke="#4C1D95" stroke-width="8"/>
+    <line x1="190" y1="185" x2="210" y2="185" stroke="#4C1D95" stroke-width="8"/>
 
-    <circle cx="320" cy="160" r="40" fill="url(#mouseBodyGradient)"/>
-    <circle cx="320" cy="160" r="25" fill="url(#earGradient)"/>
+    <circle cx="162" cy="185" r="8" fill="#1E1B4B"/>
+    <circle cx="166" cy="182" r="3" fill="#FFFFFF"/>
+    <circle cx="237" cy="185" r="8" fill="#1E1B4B"/>
+    <circle cx="241" cy="182" r="3" fill="#FFFFFF"/>
 
-    <circle cx="225" cy="210" r="22" fill="none" stroke="#2c3e50" stroke-width="6"/>
-    <circle cx="275" cy="210" r="22" fill="none" stroke="#2c3e50" stroke-width="6"/>
-    <line x1="247" y1="210" x2="253" y2="210" stroke="#2c3e50" stroke-width="6"/>
+    <ellipse cx="200" cy="210" rx="10" ry="6" fill="#F43F5E"/>
+    <path d="M190 225Q200 235 210 225" fill="none" stroke="#1E1B4B" stroke-width="4" stroke-linecap="round"/>
 
-    <circle cx="225" cy="210" r="6" fill="#2c3e50"/>
-    <circle cx="275" cy="210" r="6" fill="#2c3e50"/>
+    <rect x="110" y="300" width="45" height="30" rx="15" fill="#7C3AED"/>
+    <rect x="245" y="300" width="45" height="30" rx="15" fill="#7C3AED"/>
 
-    <polygon points="245,235 255,235 250,245" fill="#ff7675"/>
+    <path d="M120 240L280 240L290 320L110 320Z" fill="url(#laptopGrad1)" stroke="#6B7280" stroke-width="3" stroke-linejoin="round"/>
+    <rect x="100" y="320" width="200" height="15" rx="5" fill="#D1D5DB" stroke="#6B7280" stroke-width="3"/>
 
-    <line x1="180" y1="230" x2="210" y2="235" stroke="#2c3e50" stroke-width="3" stroke-linecap="round"/>
-    <line x1="175" y1="245" x2="205" y2="245" stroke="#2c3e50" stroke-width="3" stroke-linecap="round"/>
-    <line x1="290" y1="235" x2="320" y2="230" stroke="#2c3e50" stroke-width="3" stroke-linecap="round"/>
-    <line x1="295" y1="245" x2="325" y2="245" stroke="#2c3e50" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="200" cy="285" r="20" fill="#4B5563"/>
+    <text x="200" y="293" font-family="monospace" font-weight="bold" font-size="20" fill="#34D399" text-anchor="middle">&lt;/&gt;</text>
+
+    <rect x="140" y="230" width="25" height="20" rx="10" fill="#7C3AED"/>
+    <rect x="235" y="230" width="25" height="20" rx="10" fill="#7C3AED"/>
   </g>
-
-  <g transform="translate(130, 250) rotate(-45)">
-    <path d="M30 10 Q50 -10 70 10 L60 20 L70 30 Q50 50 30 30 Z" fill="#b2bec3"/>
-    <rect x="42" y="25" width="16" height="70" fill="#b2bec3" rx="5"/>
-    <circle cx="50" cy="95" r="8" fill="#b2bec3"/>
-  </g>
-
-  <g transform="translate(300, 260)">
-    <path d="M40 10 L45 20 A25 25 0 0 1 55 25 L65 20 L70 30 L60 35 A25 25 0 0 1 60 45 L70 50 L65 60 L55 55 A25 25 0 0 1 45 60 L40 70 L30 70 L35 60 A25 25 0 0 1 25 55 L15 60 L10 50 L20 45 A25 25 0 0 1 20 35 L10 30 L15 20 L25 25 A25 25 0 0 1 35 20 L30 10 Z" fill="url(#toolGradient)"/>
-    <circle cx="40" cy="40" r="12" fill="#ffffff"/>
-  </g>
-
-  <text x="250" y="420" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="bold" font-size="42" fill="#2c3e50" text-anchor="middle" letter-spacing="2">SIT</text>
-  <text x="250" y="455" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="600" font-size="20" fill="#7f8c8d" text-anchor="middle" letter-spacing="1">SHUSHU INTERNSHIP TOOL</text>
 </svg>
