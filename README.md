@@ -7,6 +7,10 @@
 <h2 align="center">SIT —— shushu internship tool</h2>
 
 <p align="center">
+  中文 | <a href="README.en.md">English</a>
+</p>
+
+<p align="center">
   <img alt="Version" src="https://img.shields.io/badge/version-v1.0.0-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
   <img alt="Audience" src="https://img.shields.io/badge/audience-CS%20Internship-orange">
@@ -21,7 +25,7 @@
 
 它适合后端、前端、全栈、移动端、测试开发、数据工程、云原生/DevOps、安全、系统、AI/算法等计算机方向，旨在帮 0 经验或低经验候选人（鼠鼠）用最短路径完成：选题、理解、复现、简历表达、面试拷问和展示材料。
 
-如果只给 JD（岗位描述/招聘需求），工具会先补一个短 intake：你的知识水平、技术栈偏好、时间预算、资源条件，以及是否要完整跑项目。默认不是一上来就完整跑到底，而是先选择运行深度。
+如果只给 JD（岗位描述/招聘需求），工具会先补一个短 intake：你的知识水平、技术栈偏好、时间预算、资源条件，以及是否要完整跑项目。
 
 > 欢迎加入鼠鼠实习就业交流群，QQ群号：976187338。
 
