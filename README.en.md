@@ -34,10 +34,6 @@ If you only provide a JD, the workflow first asks a short intake: your current l
 - Friendly link: [Shushu Internship Resume Optimizer](https://github.com/Sunanzhe2004/shushu-internship-resume-optimizer).
 - Inspiration: [leilon](https://github.com/leilon). This skill was inspired by related practices and sharing from this GitHub profile.
 
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=LiuMengxuan04/shushu-internship-tool&type=Date)](https://www.star-history.com/#LiuMengxuan04/shushu-internship-tool&Date)
-
 ## What It Does
 
 - Finds 2-3 suitable GitHub projects based on a target JD, then ranks them by role fit, ramp-up speed, interview value, run cost, and modification potential.
@@ -65,6 +61,10 @@ JD (Job Description / job posting):
 ```
 
 If you are not sure how to fill in the background section, you can provide only the JD and let the workflow ask follow-up questions.
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=LiuMengxuan04/shushu-internship-tool&type=Date)](https://www.star-history.com/#LiuMengxuan04/shushu-internship-tool&Date)
 
 ## Install Local Scripts
 
