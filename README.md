@@ -32,6 +32,7 @@
 ## 友情链接与灵感来源
 
 - 友情链接：[鼠鼠实习简历优化器](https://github.com/Sunanzhe2004/shushu-internship-resume-optimizer)：把实习代码仓库、项目总结和业务背景材料整理成简历成果、STAR 草稿和面试复盘材料。
+- 友情链接：[ProjectProof](https://github.com/YingaoWang-casia/shushu-ProjectProof)：面向单薄实习和 AI 项目的证据化审核与面试追问补强工具，帮助把真实经历讲深讲透。
 - 灵感来源：[leilon](https://github.com/leilon)，本 skill 的想法受到其相关实践与分享启发。
 
 ## 它能做什么

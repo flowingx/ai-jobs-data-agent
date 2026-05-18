@@ -32,6 +32,7 @@ If you only provide a JD, the workflow first asks a short intake: your current l
 ## Friendly Links & Inspiration
 
 - Friendly link: [Shushu Internship Resume Optimizer](https://github.com/Sunanzhe2004/shushu-internship-resume-optimizer): turns internship code repositories, project notes, and business context into resume achievements, STAR drafts, and interview review materials.
+- Friendly link: [ProjectProof](https://github.com/YingaoWang-casia/shushu-ProjectProof): an evidence-based review and interview-hardening tool for thin internship and AI projects, helping candidates explain real experience in greater depth.
 - Inspiration: [leilon](https://github.com/leilon). This skill was inspired by related practices and sharing from this GitHub profile.
 
 ## What It Does
