@@ -29,6 +29,12 @@ The toolkit is designed for computer-industry internship candidates across backe
 
 If you only provide a JD, the workflow first asks a short intake: your current level, preferred tech stack, time budget, available resources, and whether you want to fully run the project.
 
+## Featured Companion Project: VibeResume
+
+**[VibeResume](https://github.com/LiuMengxuan04/vibe-resume)** is an AI-friendly, web-first resume template that keeps your resume as `HTML + CSS`, lets an AI assistant edit both content and layout, and exports the result as a stable one-page PDF.
+
+It works as the last-mile companion to SIT: SIT helps turn a JD into project and interview material, while VibeResume turns the final resume content into a polished, version-controlled, continuously editable web resume.
+
 ## Friendly Links & Inspiration
 
 - Friendly link: [Shushu Internship Resume Optimizer](https://github.com/Sunanzhe2004/shushu-internship-resume-optimizer): turns internship code repositories, project notes, and business context into resume achievements, STAR drafts, and interview review materials.

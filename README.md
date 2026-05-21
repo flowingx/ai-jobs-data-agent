@@ -29,6 +29,12 @@
 
 > 欢迎加入鼠鼠实习就业交流群，QQ群号：976187338。
 
+## 强联动新项目：VibeResume
+
+**[VibeResume](https://github.com/LiuMengxuan04/vibe-resume)** 是一个 AI 友好、网页优先、可稳定导出 PDF 的简历模板：把简历维护成 `HTML + CSS`，让 AI 直接改内容和排版，再一键导出一页 PDF。
+
+它可以作为 SIT 的“最后一公里”联动项目：SIT 负责把 JD 转成项目与面试材料，VibeResume 负责把最终简历内容沉淀成漂亮、可版本管理、可持续迭代的网页简历。
+
 ## 友情链接与灵感来源
 
 - 友情链接：[鼠鼠实习简历优化器](https://github.com/Sunanzhe2004/shushu-internship-resume-optimizer)：把实习代码仓库、项目总结和业务背景材料整理成简历成果、STAR 草稿和面试复盘材料。
