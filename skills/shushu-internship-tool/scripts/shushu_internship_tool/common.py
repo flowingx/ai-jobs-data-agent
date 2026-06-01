@@ -66,6 +66,15 @@ def safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None or value == "":
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def markdown_table(headers: list[str], rows: Iterable[Iterable[Any]]) -> str:
     def cell(value: Any) -> str:
         text = "" if value is None else str(value)

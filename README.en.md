@@ -27,7 +27,7 @@ A JD usually contains role responsibilities, required skills, tech stacks, busin
 
 The toolkit is designed for computer-industry internship candidates across backend, frontend, full-stack, mobile, test development, data engineering, cloud/DevOps, security, systems, AI, and algorithm roles. It is especially useful for beginners or low-experience candidates who need a fast path from role targeting to project selection, code understanding, project modification, resume writing, and interview drilling.
 
-If you only provide a JD, the workflow first asks a short intake: your current level, preferred tech stack, time budget, available resources, and whether you want to fully run the project.
+If you only provide a JD, the workflow first does a quick JD read and then triggers a one-time project preference / taste yes-no gate. You can choose “no preference, recommend by JD and the safe default strategy,” or choose “yes” and then select or customize one of A/B/C/D. After that, the workflow asks a short intake: your current level, current tech stack, time budget, available resources, and desired run depth.
 
 ## Featured Companion Project: VibeResume
 
@@ -51,23 +51,31 @@ It works as the last-mile companion to SIT: SIT helps turn a JD into project and
 
 ## Recommended Usage
 
-Send your target JD and personal background to an AI assistant, then choose a run depth:
+Send your target JD and personal background to an AI assistant, then choose a run depth. If you already have a clear project preference / taste, you can include it in the first message, but the workflow still asks for one yes/no confirmation before using it as the D custom preference:
 
 ```text
 Use shushu internship tool to help me turn the following JD into a computer-industry internship project that I can apply with, explain in interviews, and present clearly.
 
 My background:
-- Current level:
-- Familiar languages/frameworks:
-- Time budget:
-- Local/remote resources:
+- Current level: took CS courses but have few projects
+- Familiar languages/frameworks: Python, FastAPI, a bit of React
+- Time budget: 2 days
+- Local/remote resources: laptop + Docker, no GPU
 - Desired run depth: interview-only / smoke-test / local-full-run / remote-full-run
+- Project preference / taste: I prefer backend + AI application projects; I want something that can run locally and is easy to explain in interviews; I do not want a pure frontend project or a project that depends on multi-GPU or complex cloud services.
 
 JD (Job Description / job posting):
 ...
 ```
 
-If you are not sure how to fill in the background section, you can provide only the JD and let the workflow ask follow-up questions.
+If you do not have a preference yet, write “Project preference / taste: none, recommend by JD,” or just provide the JD. After the initial JD read, the workflow always asks one yes/no question: do you have your own project preference / taste? If your first message already contains a preference, the workflow first asks whether to use that text as the D custom preference.
+
+- Choose “no”: continue the original workflow and rank by JD fit, skill fit, run feasibility, resource cost, project risk, and interview value. No taste weight is added; any preference text in the initial message is ignored.
+- Choose “yes”: the workflow shows A/B/C/D options.
+  - A/B/C are generated dynamically from the broad project categories implied by the JD. If you provided background, tech stack, time budget, or resources, those are considered too; otherwise they are generated from the JD and conservative defaults only.
+  - D is a directly fillable custom input box / blank field, such as `D. ________`. You can write: “I prefer backend + AI apps, do not want pure frontend, want Docker local run, and want the project to be interview-friendly.” If your initial message already had a preference and you confirm it, D reuses that text.
+
+Expressions such as “do not want,” “avoid,” and “do not depend on” are treated as avoid-tags, not positive preferences.
 
 ## Star History
 
@@ -90,11 +98,19 @@ Audit a local project:
 python -m shushu_internship_tool.repo_audit --repo /path/to/repo --out reports/audit --name my-project
 ```
 
-Rank candidate projects:
+Rank candidate projects without taste, compatible with the old command:
 
 ```bash
 python -m shushu_internship_tool.candidate_score --jd jd.txt --candidates candidates.json --out reports/ranking
 ```
+
+Rank candidate projects with an optional project preference / taste file:
+
+```bash
+python -m shushu_internship_tool.candidate_score --jd jd.txt --candidates candidates.json --taste taste.txt --out reports/ranking
+```
+
+`candidate_score` computes `raw_score` first and then normalizes it to 0-100 using `max_raw_score`: 104 when there is no effective taste, and 114 when an effective taste adds the small `user_preference` dimension. Missing `--taste`, an empty file, whitespace-only text, or no-op text such as “none / no preference / skip” is treated as no effective taste.
 
 Create an interview-pack skeleton:
 
@@ -107,6 +123,7 @@ After installation, you can also use the command-line entry points:
 ```bash
 shushu-repo-audit --repo /path/to/repo --out reports/audit --name my-project
 shushu-candidate-score --jd jd.txt --candidates candidates.json --out reports/ranking
+shushu-candidate-score --jd jd.txt --candidates candidates.json --taste taste.txt --out reports/ranking
 shushu-interview-pack --project-notes reports/audit --out reports/interview-pack
 ```
 
@@ -126,10 +143,19 @@ shushu-interview-pack --project-notes reports/audit --out reports/interview-pack
     "runnable": true,
     "compute": "local_docker",
     "mod_ideas": ["add JWT auth", "add Redis cache", "add integration tests"],
-    "risk_notes": ["database migration needs setup"]
+    "risk_notes": ["database migration needs setup"],
+    "taste_tags": ["backend", "local-docker", "interview-friendly", "api", "database"],
+    "project_taste_notes": [
+      "backend engineering oriented",
+      "clear Docker local smoke-test path",
+      "API / database / cache modifications are easy to explain in interviews"
+    ],
+    "avoid_tags": ["cloud-heavy"]
   }
 ]
 ```
+
+The taste fields are optional. `taste_tags` describes what user preferences a project can match, `avoid_tags` describes project attributes that some users may want to avoid, and `project_taste_notes` is human-readable explanation only; it does not affect script scoring.
 
 ## Job-Search Efficiency Principles
 
