@@ -197,6 +197,32 @@ cd shushu-internship-tool
 . .venv/bin/activate
 pytest
 ```
+## 核心作者
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <a href="https://github.com/LiuMengxuan04">
+        <img src="https://github.com/LiuMengxuan04.png?size=160" width="96" height="96" alt="LiuMengxuan04" /><br />
+        <strong>Liu Mengxuan</strong>
+      </a>
+      <br />
+      <sub><strong>发起者</strong></sub>
+      <br />
+      <sub>owner</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <a href="https://github.com/GateJustice">
+        <img src="https://github.com/GateJustice.png?size=160" width="96" height="96" alt="GateJustice" /><br />
+        <strong>GateJustice</strong>
+      </a>
+      <br />
+      <sub><strong>共同发起者</strong></sub>
+      <br />
+      <sub></sub>
+    </td>
+  </tr>
+</table>
 
 ## License
 
