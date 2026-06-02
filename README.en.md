@@ -197,7 +197,32 @@ cd shushu-internship-tool
 . .venv/bin/activate
 pytest
 ```
+## Core Authors
 
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <a href="https://github.com/LiuMengxuan04">
+        <img src="https://github.com/LiuMengxuan04.png?size=160" width="120" height="120" alt="LiuMengxuan04" /><br />
+        <strong>Liu Mengxuan</strong>
+      </a>
+      <br />
+      <sub><strong>Owner</strong></sub>
+      <br />
+      <sub></sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <a href="https://github.com/GateJustice">
+        <img src="https://github.com/GateJustice.png?size=160" width="120" height="120" alt="GateJustice" /><br />
+        <strong>GateJustice</strong>
+      </a>
+      <br />
+      <sub><strong>collaborator</strong></sub>
+      <br />
+      <sub></sub>
+    </td>
+  </tr>
+</table>
 ## License
 
 Apache-2.0
