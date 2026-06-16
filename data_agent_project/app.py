@@ -39,11 +39,11 @@ experience_levels(level TEXT, job_count INTEGER, avg_salary REAL, avg_years_expe
 
 location_summary(country TEXT, city TEXT, job_count INTEGER, avg_salary REAL)"""
 
-SQL_RULES = """SECURITY: You are FORBIDDEN from generating CREATE TABLE, DROP TABLE, ALTER TABLE, INSERT, UPDATE, or DELETE. Output ONLY SELECT queries. The database must remain 100% Read-Only.
+SQL_RULES = """SECURITY: You are STRICTLY FORBIDDEN from generating CREATE TABLE, DROP TABLE, ALTER TABLE, INSERT, UPDATE, or DELETE. Output ONLY SELECT queries. The database must remain 100% Read-Only.
 
 ADVANCED SQL RULES:
 
-1. MANDATORY CTE FOR DYNAMIC FEATURES: If the user asks for a categorization, grouping, or flag that does not exist in the base tables (e.g., classifying "Senior" vs "Junior" based on years_of_experience, or grouping specific tech stacks), you MUST use a Common Table Expression (WITH clause) to create a virtual table in memory.
+1. CTE IS REQUIRED (MANDATORY) FOR DYNAMIC FEATURES: Whenever the user asks for a categorization, grouping, or flag that does not exist as a column in the base tables (e.g., classifying "Senior" vs "Junior" based on years_of_experience, or grouping specific tech stacks), you MUST use a Common Table Expression (WITH clause) to create a virtual table in memory. DO NOT skip CTEs for these cases — they are mandatory.
 
    Template:
    WITH DynamicCategorization AS (
