@@ -144,10 +144,22 @@ def extract_sql(text: str) -> str:
     if ")" in text and "WITH" not in text.upper():
         text = text.split(")")[0].strip()
     # Truncation guard: if SQL ends mid-expression, return empty
-    if text and not text.rstrip().endswith(";") and not text.rstrip().endswith(")"):
-        last_word = text.rstrip().split()[-1].upper() if text.rstrip().split() else ""
-        if last_word in ("LIKE", "AND", "OR", "ON", "WHERE", "SET", "VALUES", "THEN", "ELSE", "WHEN"):
-            text = ""
+    if text:
+        stripped = text.rstrip()
+        incomplete_indicators = (
+            not stripped.endswith(";") and
+            not stripped.endswith(")") and
+            not stripped.endswith("'") and
+            not stripped.endswith('"')
+        )
+        if incomplete_indicators:
+            last_token = stripped.split()[-1].upper() if stripped.split() else ""
+            if last_token in ("LIKE", "AND", "OR", "ON", "WHERE", "SET", "VALUES", "THEN", "ELSE", "WHEN", "IN", "BETWEEN", "IS", "AS"):
+                text = ""
+            elif re.match(r'\w+\.\w+$', stripped):
+                text = ""
+            elif re.match(r'^\w+$', stripped) and stripped.upper() not in ("SELECT", "FROM", "WHERE", "AND", "OR", "ON", "GROUP", "ORDER", "LIMIT", "HAVING", "AS", "CASE", "WHEN", "THEN", "ELSE", "END", "DISTINCT", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "UNION", "ALL", "EXISTS", "NOT", "IN", "LIKE", "BETWEEN", "IS", "NULL", "TRUE", "FALSE"):
+                text = ""
     return text
 
 
