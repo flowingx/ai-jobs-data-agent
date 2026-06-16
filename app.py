@@ -414,57 +414,49 @@ def main():
 
     with tab1:
         # Input at top — always visible
-        if "placeholder_idx" not in st.session_state:
-            st.session_state.placeholder_idx = 0
         if "form_key" not in st.session_state:
             st.session_state.form_key = 0
-        current_placeholder = PLACEHOLDER_TEXT[st.session_state.placeholder_idx]
 
         with st.form(key=f"query_form_{st.session_state.form_key}", clear_on_submit=False):
-            question = st.text_input("Ask a question about the job market:", placeholder=current_placeholder)
+            question = st.text_input("Ask a question about the job market:", placeholder="e.g., What are the top 10 skills?")
             submitted = st.form_submit_button("Search", type="primary")
 
-        if submitted:
-            query = question
-            if not query:
-                st.session_state.placeholder_idx = (st.session_state.placeholder_idx + 1) % len(PLACEHOLDER_TEXT)
-                st.rerun()
-            else:
-                status = st.status(f"Analyzing: {query}...", expanded=True)
-                try:
-                    llm = get_llm(engine_key)
-                    sql, columns, rows, error = None, [], [], None
-                    for attempt in range(3):
-                        error_hint = f"\nPrevious SQL failed: {error}\nGenerate a DIFFERENT valid SQL query." if error else ""
-                        sql = generate_sql_with_llm(llm, query, error_hint)
-                        columns, rows, error = execute_sql(sql) if sql else ([], [], "Empty SQL generated")
-                        if not error:
-                            break
+        if submitted and question:
+            status = st.status(f"Analyzing: {question}...", expanded=True)
+            try:
+                llm = get_llm(engine_key)
+                sql, columns, rows, error = None, [], [], None
+                for attempt in range(3):
+                    error_hint = f"\nPrevious SQL failed: {error}\nGenerate a DIFFERENT valid SQL query." if error else ""
+                    sql = generate_sql_with_llm(llm, question, error_hint)
+                    columns, rows, error = execute_sql(sql) if sql else ([], [], "Empty SQL generated")
+                    if not error:
+                        break
 
-                    if error:
-                        status.update(label="Failed", state="error")
-                        st.error(f"SQL Error: {error}")
-                        if sql:
-                            st.code(sql, language="sql")
-                    else:
-                        status.update(label="Complete", state="complete")
+                if error:
+                    status.update(label="Failed", state="error")
+                    st.error(f"SQL Error: {error}")
+                    if sql:
                         st.code(sql, language="sql")
-                        df = pd.DataFrame(rows, columns=columns)
-                        st.dataframe(df, use_container_width=True)
-                        chart_type = auto_detect_chart(sql, columns, rows)
-                        if chart_type and rows:
-                            st.subheader("Visualization")
-                            render_chart(chart_type, columns, rows, make_chart_title(sql, columns), sql)
-                        if rows:
-                            st.subheader("AI Summary")
-                            st.markdown(summarize_with_llm(llm, query, sql, columns, rows))
-                except Exception as e:
-                    status.update(label="Error", state="error")
-                    st.error(f"Error: {str(e)}")
-                    if engine_key == "local":
-                        st.info("Ensure the local LLM server is running (see AGENT.md)")
-                    else:
-                        st.info("Check your DeepSeek API key and network connection")
+                else:
+                    status.update(label="Complete", state="complete")
+                    st.code(sql, language="sql")
+                    df = pd.DataFrame(rows, columns=columns)
+                    st.dataframe(df, use_container_width=True)
+                    chart_type = auto_detect_chart(sql, columns, rows)
+                    if chart_type and rows:
+                        st.subheader("Visualization")
+                        render_chart(chart_type, columns, rows, make_chart_title(sql, columns), sql)
+                    if rows:
+                        st.subheader("AI Summary")
+                        st.markdown(summarize_with_llm(llm, question, sql, columns, rows))
+            except Exception as e:
+                status.update(label="Error", state="error")
+                st.error(f"Error: {str(e)}")
+                if engine_key == "local":
+                    st.info("Ensure the local LLM server is running (see AGENT.md)")
+                else:
+                    st.info("Check your DeepSeek API key and network connection")
 
         # Example buttons below input
         st.divider()
