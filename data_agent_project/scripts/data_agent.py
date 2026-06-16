@@ -19,23 +19,25 @@ LLM_API_KEY = os.getenv("LLM_API_KEY", "not-needed")
 
 MAX_RETRIES = 3
 
-SCHEMA_HINT = """You have these SQLite tables:
+VALID_COLUMNS = {
+    "job_postings": {"job_id", "job_title", "job_category", "experience_level", "years_of_experience", "education_required", "annual_salary_usd", "salary_min_usd", "salary_max_usd", "city", "country", "remote_work", "company_size", "industry", "required_skills", "ai_salary_premium_pct", "demand_score", "demand_growth_yoy_pct", "benefits_score_10", "posting_year", "posting_month", "is_senior", "is_remote_friendly", "is_llm_role", "salary_tier"},
+    "job_skills": {"id", "job_id", "skill"},
+    "job_categories": {"category", "job_count", "avg_salary", "avg_demand_score"},
+    "experience_levels": {"level", "job_count", "avg_salary", "avg_years_experience"},
+    "location_summary": {"country", "city", "job_count", "avg_salary"},
+}
 
-job_postings(job_id TEXT PRIMARY KEY, job_title TEXT, job_category TEXT, experience_level TEXT,
-  years_of_experience INTEGER, education_required TEXT, annual_salary_usd INTEGER,
-  salary_min_usd INTEGER, salary_max_usd INTEGER, city TEXT, country TEXT,
-  remote_work TEXT, company_size TEXT, industry TEXT, required_skills TEXT,
-  ai_salary_premium_pct REAL, demand_score INTEGER, demand_growth_yoy_pct REAL,
-  benefits_score_10 REAL, posting_year INTEGER, posting_month INTEGER,
-  is_senior INTEGER, is_remote_friendly INTEGER, is_llm_role INTEGER, salary_tier TEXT)
+SCHEMA_HINT = """EXACT COLUMNS YOU CAN USE (no others exist):
 
-job_skills(id INTEGER PRIMARY KEY, job_id TEXT, skill TEXT)
+job_postings: job_id, job_title, job_category, experience_level, years_of_experience, education_required, annual_salary_usd, salary_min_usd, salary_max_usd, city, country, remote_work, company_size, industry, required_skills, ai_salary_premium_pct, demand_score, demand_growth_yoy_pct, benefits_score_10, posting_year, posting_month, is_senior, is_remote_friendly, is_llm_role, salary_tier
 
-job_categories(category TEXT, job_count INTEGER, avg_salary REAL, avg_demand_score REAL)
+job_skills: id, job_id, skill
 
-experience_levels(level TEXT, job_count INTEGER, avg_salary REAL, avg_years_experience REAL)
+job_categories: category, job_count, avg_salary, avg_demand_score
 
-location_summary(country TEXT, city TEXT, job_count INTEGER, avg_salary REAL)"""
+experience_levels: level, job_count, avg_salary, avg_years_experience
+
+location_summary: country, city, job_count, avg_salary"""
 
 SQL_RULES = """SECURITY: You are STRICTLY FORBIDDEN from generating CREATE TABLE, DROP TABLE, ALTER TABLE, INSERT, UPDATE, or DELETE. Output ONLY SELECT queries. The database must remain 100% Read-Only.
 
@@ -125,6 +127,18 @@ def extract_sql(text: str) -> str:
     return text
 
 
+def validate_sql_columns(sql: str):
+    """Reject SQL with columns that don't exist in the schema."""
+    import re as _re
+    refs = _re.findall(r'(\w+)\.(\w+)', sql)
+    for table, col in refs:
+        table_lower = table.lower()
+        col_lower = col.lower()
+        if table_lower in VALID_COLUMNS and col_lower not in VALID_COLUMNS[table_lower]:
+            return f"Column '{col}' does not exist in table '{table}'"
+    return None
+
+
 def generate_sql_with_llm(llm, question: str, error_hint: str = "") -> str:
     error_section = f"\nPrevious SQL failed: {error_hint}\nGenerate a DIFFERENT valid SQL query." if error_hint else ""
     messages = [
@@ -163,6 +177,15 @@ def query_agent(question: str, verbose: bool = True) -> dict:
         result["retries"] = attempt
         if verbose:
             print(f"[{attempt+1}] SQL: {sql}")
+
+        # Validate columns before execution
+        col_error = validate_sql_columns(sql) if sql else "Empty SQL"
+        if col_error:
+            if verbose:
+                print(f"    Validation: {col_error}")
+            error_hint = col_error
+            result["error"] = col_error
+            continue
 
         columns, rows, error = execute_sql(sql)
         if error:
