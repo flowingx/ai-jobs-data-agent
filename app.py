@@ -62,6 +62,51 @@ SAMPLE_QUESTIONS = {
     ],
 }
 
+EXAMPLE_QUERIES = [
+    {
+        "question": "Top 10 skills by job count",
+        "sql": 'SELECT skill AS "Skill", COUNT(*) AS "Job Count" FROM job_skills GROUP BY skill ORDER BY COUNT(*) DESC LIMIT 10',
+        "chart": "bar",
+    },
+    {
+        "question": "Average salary by experience level",
+        "sql": 'SELECT experience_level AS "Experience", ROUND(AVG(annual_salary_usd)) AS "Avg Salary" FROM job_postings GROUP BY experience_level ORDER BY AVG(annual_salary_usd) DESC',
+        "chart": "bar",
+    },
+    {
+        "question": "Job count by category",
+        "sql": 'SELECT job_category AS "Category", COUNT(*) AS "Count" FROM job_postings GROUP BY job_category ORDER BY COUNT(*) DESC',
+        "chart": "pie",
+    },
+    {
+        "question": "Remote vs On-site jobs",
+        "sql": 'SELECT CASE WHEN remote_work = 1 THEN "Remote" ELSE "On-site" END AS "Work Type", COUNT(*) AS "Count" FROM job_postings GROUP BY remote_work',
+        "chart": "pie",
+    },
+    {
+        "question": "Top 10 cities by job postings",
+        "sql": 'SELECT city AS "City", COUNT(*) AS "Count" FROM job_postings WHERE city != "" GROUP BY city ORDER BY COUNT(*) DESC LIMIT 10',
+        "chart": "bar",
+    },
+    {
+        "question": "Salary distribution by job category",
+        "sql": 'SELECT job_category AS "Category", ROUND(AVG(annual_salary_usd)) AS "Avg Salary", ROUND(MIN(annual_salary_usd)) AS "Min", ROUND(MAX(annual_salary_usd)) AS "Max" FROM job_postings GROUP BY job_category ORDER BY AVG(annual_salary_usd) DESC',
+        "chart": "bar",
+    },
+    {
+        "question": "Jobs by posting year",
+        "sql": 'SELECT posting_year AS "Year", COUNT(*) AS "Count" FROM job_postings GROUP BY posting_year ORDER BY posting_year',
+        "chart": "line",
+    },
+    {
+        "question": "LLM vs non-LLM job salary comparison",
+        "sql": 'SELECT CASE WHEN is_llm_role = 1 THEN "LLM Role" ELSE "Non-LLM" END AS "Role Type", ROUND(AVG(annual_salary_usd)) AS "Avg Salary" FROM job_postings GROUP BY is_llm_role',
+        "chart": "bar",
+    },
+]
+
+PLACEHOLDER_TEXT = [q["question"] for q in EXAMPLE_QUERIES]
+
 
 def get_llm(engine: str = "deepseek"):
     if engine == "deepseek":
@@ -355,55 +400,91 @@ def main():
 
     with tab1:
         st.subheader("Natural Language Query")
-        if "query_running" not in st.session_state:
-            st.session_state.query_running = False
 
-        with st.form("query_form", clear_on_submit=False):
-            question = st.text_input("Enter your question:", placeholder="e.g., What is the average salary for remote vs on-site AI jobs?")
-            submitted = st.form_submit_button("Search", type="primary")
+        # Rotate placeholder
+        if "placeholder_idx" not in st.session_state:
+            st.session_state.placeholder_idx = 0
+        current_placeholder = PLACEHOLDER_TEXT[st.session_state.placeholder_idx]
 
-        if submitted and st.session_state.query_running:
-            st.info("Query in progress, please wait...")
-        elif submitted:
-            query = question or "What is the average salary for remote vs on-site AI jobs?"
-            st.session_state.query_running = True
-            status = st.status(f"Analyzing with {engine}...", expanded=True)
+        # Quick examples
+        st.caption("Try these examples:")
+        cols = st.columns(4)
+        for i, eq in enumerate(EXAMPLE_QUERIES[:4]):
+            with cols[i]:
+                if st.button(eq["question"], key=f"example_{i}"):
+                    st.session_state.selected_example = i
+                    st.rerun()
+
+        # Handle example selection
+        if "selected_example" in st.session_state:
+            idx = st.session_state.pop("selected_example")
+            eq = EXAMPLE_QUERIES[idx]
+            status = st.status(f"Running: {eq['question']}...", expanded=True)
             try:
-                llm = get_llm(engine_key)
-                sql, columns, rows, error = None, [], [], None
-                for attempt in range(3):
-                    error_hint = f"\nPrevious SQL failed: {error}\nGenerate a DIFFERENT valid SQL query." if error else ""
-                    sql = generate_sql_with_llm(llm, query, error_hint)
-                    columns, rows, error = execute_sql(sql) if sql else ([], [], "Empty SQL generated")
-                    if not error:
-                        break
-
+                columns, rows, error = execute_sql(eq["sql"])
                 if error:
-                    status.update(label="Query failed", state="error")
+                    status.update(label="Failed", state="error")
                     st.error(f"SQL Error: {error}")
-                    if sql:
-                        st.code(sql, language="sql")
                 else:
-                    status.update(label="Query complete", state="complete")
-                    st.code(sql, language="sql")
+                    status.update(label="Complete", state="complete")
+                    st.code(eq["sql"], language="sql")
                     df = pd.DataFrame(rows, columns=columns)
                     st.dataframe(df, use_container_width=True)
-                    chart_type = auto_detect_chart(sql, columns, rows)
-                    if chart_type and rows:
+                    if eq.get("chart") and rows:
                         st.subheader("Visualization")
-                        render_chart(chart_type, columns, rows, make_chart_title(sql, columns), sql)
-                    if rows:
-                        st.subheader("AI Summary")
-                        st.markdown(summarize_with_llm(llm, query, sql, columns, rows))
+                        render_chart(eq["chart"], columns, rows, eq["question"], eq["sql"])
             except Exception as e:
                 status.update(label="Error", state="error")
                 st.error(f"Error: {str(e)}")
-                if engine_key == "local":
-                    st.info("Ensure the local LLM server is running (see AGENT.md)")
-                else:
-                    st.info("Check your DeepSeek API key and network connection")
-            finally:
-                st.session_state.query_running = False
+
+        # Custom query form
+        with st.form("query_form", clear_on_submit=False):
+            question = st.text_input("Or ask your own question:", placeholder=current_placeholder)
+            submitted = st.form_submit_button("Search", type="primary")
+
+        if submitted:
+            query = question
+            if not query:
+                # Empty input → fill with placeholder, don't submit
+                st.session_state.placeholder_idx = (st.session_state.placeholder_idx + 1) % len(PLACEHOLDER_TEXT)
+                st.rerun()
+            else:
+                # Custom query via LLM
+                status = st.status(f"Analyzing: {query}...", expanded=True)
+                try:
+                    llm = get_llm(engine_key)
+                    sql, columns, rows, error = None, [], [], None
+                    for attempt in range(3):
+                        error_hint = f"\nPrevious SQL failed: {error}\nGenerate a DIFFERENT valid SQL query." if error else ""
+                        sql = generate_sql_with_llm(llm, query, error_hint)
+                        columns, rows, error = execute_sql(sql) if sql else ([], [], "Empty SQL generated")
+                        if not error:
+                            break
+
+                    if error:
+                        status.update(label="Failed", state="error")
+                        st.error(f"SQL Error: {error}")
+                        if sql:
+                            st.code(sql, language="sql")
+                    else:
+                        status.update(label="Complete", state="complete")
+                        st.code(sql, language="sql")
+                        df = pd.DataFrame(rows, columns=columns)
+                        st.dataframe(df, use_container_width=True)
+                        chart_type = auto_detect_chart(sql, columns, rows)
+                        if chart_type and rows:
+                            st.subheader("Visualization")
+                            render_chart(chart_type, columns, rows, make_chart_title(sql, columns), sql)
+                        if rows:
+                            st.subheader("AI Summary")
+                            st.markdown(summarize_with_llm(llm, query, sql, columns, rows))
+                except Exception as e:
+                    status.update(label="Error", state="error")
+                    st.error(f"Error: {str(e)}")
+                    if engine_key == "local":
+                        st.info("Ensure the local LLM server is running (see AGENT.md)")
+                    else:
+                        st.info("Check your DeepSeek API key and network connection")
 
     with tab2:
         st.subheader("Data Browser")
