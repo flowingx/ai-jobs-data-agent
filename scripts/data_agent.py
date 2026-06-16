@@ -31,15 +31,14 @@ experience_levels: level, job_count, avg_salary, avg_years_experience
 
 location_summary: country, city, job_count, avg_salary"""
 
-SQL_RULES = """RULES:
+SQL_RULES = """CRITICAL RULES:
+- Output ONLY the SQL query. No explanations, no comments, no markdown.
 - SELECT only. No CREATE/DROP/ALTER/INSERT/UPDATE/DELETE.
-- Use WITH CTE for dynamic categorization/grouping.
-- Use LOWER(col) LIKE LOWER('%keyword%') for text search.
-- JOIN job_skills js ON jp.job_id = js.job_id for skill analysis.
-- Use English aliases for columns (AS "English Label") so chart labels are readable.
-- Keep SQL SHORT. Max 30 lines. Use simple WHERE conditions, not 100+ OR chains.
-- Do NOT include comments or explanations. Output ONLY the SQL query.
-- Do NOT wrap in markdown code blocks."""
+- Max 15 lines of SQL. Use simple WHERE, never 100+ OR chains.
+- For skill search: use `js.skill = 'python'` or `js.skill LIKE '%python%'`, not OR chains.
+- For job category: use `job_category = 'AI'`, not OR chains matching title words.
+- Use English column aliases (AS "Label") for chart readability.
+- NEVER repeat the same pattern with different values. Use a subquery or IN clause instead."""
 
 
 def get_llm(engine: str = "deepseek"):
@@ -49,7 +48,7 @@ def get_llm(engine: str = "deepseek"):
             base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
             api_key=os.getenv("DEEPSEEK_API_KEY", ""),
             temperature=0,
-            max_tokens=4096,
+            max_tokens=1024,
         )
     else:
         return ChatOpenAI(
@@ -74,7 +73,8 @@ def execute_sql(sql: str) -> tuple[list, list, Optional[str]]:
         conn.close()
 
 
-MAX_SQL_LENGTH = 2000
+MAX_SQL_LENGTH = 1500
+MAX_OR_CHAINS = 10
 
 
 def clean_llm_output(text: str) -> str:
@@ -98,6 +98,16 @@ def extract_sql(text: str) -> str:
     # Strip comments
     text = re.sub(r'--[^\n]*', '', text)
     text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+    # Count OR chains — if too many, the LLM is hallucinating
+    or_count = len(re.findall(r'\bOR\b', text, re.IGNORECASE))
+    if or_count > MAX_OR_CHAINS:
+        # Truncate at the Nth OR and close the WHERE clause
+        parts = re.split(r'\bOR\b', text, flags=re.IGNORECASE)
+        if len(parts) > MAX_OR_CHAINS:
+            text = " OR ".join(parts[:MAX_OR_CHAINS])
+            # Try to close the WHERE clause
+            if "WHERE" in text.upper():
+                text += "\n    LIMIT 50"
     # Truncate if too long
     if len(text) > MAX_SQL_LENGTH:
         text = text[:MAX_SQL_LENGTH]
