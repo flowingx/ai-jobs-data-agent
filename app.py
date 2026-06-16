@@ -416,9 +416,11 @@ def main():
         # Input at top — always visible
         if "placeholder_idx" not in st.session_state:
             st.session_state.placeholder_idx = 0
+        if "form_key" not in st.session_state:
+            st.session_state.form_key = 0
         current_placeholder = PLACEHOLDER_TEXT[st.session_state.placeholder_idx]
 
-        with st.form("query_form", clear_on_submit=False):
+        with st.form(key=f"query_form_{st.session_state.form_key}", clear_on_submit=False):
             question = st.text_input("Ask a question about the job market:", placeholder=current_placeholder)
             submitted = st.form_submit_button("Search", type="primary")
 
@@ -472,6 +474,7 @@ def main():
             with cols[i]:
                 if st.button(eq["question"], key=f"example_{i}"):
                     st.session_state.selected_example = i
+                    st.session_state.form_key += 1
                     st.rerun()
 
         # Handle example selection
