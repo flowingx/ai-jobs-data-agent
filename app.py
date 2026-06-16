@@ -359,6 +359,9 @@ def main():
             question = st.text_input("Enter your question:", placeholder="e.g., What is the average salary for remote vs on-site AI jobs?")
             submitted = st.form_submit_button("Search", type="primary")
 
+        if submitted and not question:
+            st.warning("Please enter a question before searching.")
+
         if submitted and question:
             status = st.status(f"Analyzing with {engine}...", expanded=True)
             try:
