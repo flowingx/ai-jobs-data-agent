@@ -399,57 +399,21 @@ def main():
     tab1, tab2, tab3 = st.tabs(["Smart Query", "Data Browser", "Preset Analysis"])
 
     with tab1:
-        st.subheader("Natural Language Query")
-
-        # Rotate placeholder
+        # Input at top — always visible
         if "placeholder_idx" not in st.session_state:
             st.session_state.placeholder_idx = 0
         current_placeholder = PLACEHOLDER_TEXT[st.session_state.placeholder_idx]
 
-        # Quick examples
-        st.caption("Try these examples:")
-        cols = st.columns(4)
-        for i, eq in enumerate(EXAMPLE_QUERIES[:4]):
-            with cols[i]:
-                if st.button(eq["question"], key=f"example_{i}"):
-                    st.session_state.selected_example = i
-                    st.rerun()
-
-        # Handle example selection
-        if "selected_example" in st.session_state:
-            idx = st.session_state.pop("selected_example")
-            eq = EXAMPLE_QUERIES[idx]
-            status = st.status(f"Running: {eq['question']}...", expanded=True)
-            try:
-                columns, rows, error = execute_sql(eq["sql"])
-                if error:
-                    status.update(label="Failed", state="error")
-                    st.error(f"SQL Error: {error}")
-                else:
-                    status.update(label="Complete", state="complete")
-                    st.code(eq["sql"], language="sql")
-                    df = pd.DataFrame(rows, columns=columns)
-                    st.dataframe(df, use_container_width=True)
-                    if eq.get("chart") and rows:
-                        st.subheader("Visualization")
-                        render_chart(eq["chart"], columns, rows, eq["question"], eq["sql"])
-            except Exception as e:
-                status.update(label="Error", state="error")
-                st.error(f"Error: {str(e)}")
-
-        # Custom query form
         with st.form("query_form", clear_on_submit=False):
-            question = st.text_input("Or ask your own question:", placeholder=current_placeholder)
+            question = st.text_input("Ask a question about the job market:", placeholder=current_placeholder)
             submitted = st.form_submit_button("Search", type="primary")
 
         if submitted:
             query = question
             if not query:
-                # Empty input → fill with placeholder, don't submit
                 st.session_state.placeholder_idx = (st.session_state.placeholder_idx + 1) % len(PLACEHOLDER_TEXT)
                 st.rerun()
             else:
-                # Custom query via LLM
                 status = st.status(f"Analyzing: {query}...", expanded=True)
                 try:
                     llm = get_llm(engine_key)
@@ -485,6 +449,38 @@ def main():
                         st.info("Ensure the local LLM server is running (see AGENT.md)")
                     else:
                         st.info("Check your DeepSeek API key and network connection")
+
+        # Example buttons below input
+        st.divider()
+        st.caption("Quick examples — click to run directly:")
+        cols = st.columns(4)
+        for i, eq in enumerate(EXAMPLE_QUERIES[:4]):
+            with cols[i]:
+                if st.button(eq["question"], key=f"example_{i}"):
+                    st.session_state.selected_example = i
+                    st.rerun()
+
+        # Handle example selection
+        if "selected_example" in st.session_state:
+            idx = st.session_state.pop("selected_example")
+            eq = EXAMPLE_QUERIES[idx]
+            status = st.status(f"Running: {eq['question']}...", expanded=True)
+            try:
+                columns, rows, error = execute_sql(eq["sql"])
+                if error:
+                    status.update(label="Failed", state="error")
+                    st.error(f"SQL Error: {error}")
+                else:
+                    status.update(label="Complete", state="complete")
+                    st.code(eq["sql"], language="sql")
+                    df = pd.DataFrame(rows, columns=columns)
+                    st.dataframe(df, use_container_width=True)
+                    if eq.get("chart") and rows:
+                        st.subheader("Visualization")
+                        render_chart(eq["chart"], columns, rows, eq["question"], eq["sql"])
+            except Exception as e:
+                status.update(label="Error", state="error")
+                st.error(f"Error: {str(e)}")
 
     with tab2:
         st.subheader("Data Browser")
