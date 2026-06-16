@@ -89,7 +89,7 @@ def generate_report():
 
         <div class="section">
             <h2>一、项目概述</h2>
-            <p>本项目基于 shushu-internship-tool（鼠鼠实习妙妙工具）开源项目改造，实现了一个求职市场数据分析智能体（Data Agent）。</p>
+            <p>本项目实现了一个基于 LangChain + SQLite + LLM 的求职市场数据分析智能体（Data Agent）。</p>
             <p>核心功能：</p>
             <ul>
                 <li>自然语言问题理解与 SQL 自动生成</li>
@@ -245,7 +245,7 @@ result = agent.invoke({{"input": "哪些技能在求职市场上最热门？"}})
 
         <div class="footer">
             <p>实验7 - 数据分析智能体 | 数据库系统原理 2025-2026</p>
-            <p>基于 shushu-internship-tool 开源项目改造 | {now}</p>
+            <p>AI Jobs Market Data Analysis Agent | {now}</p>
         </div>
     </div>
 </body>

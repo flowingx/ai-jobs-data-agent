@@ -1,7 +1,0 @@
-.env
-db/
-__pycache__/
-*.pyc
-.DS_Store
-data_agent_project/data/ai_jobs_market_2025_2026.csv
-data_agent_project/db/

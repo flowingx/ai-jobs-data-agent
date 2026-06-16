@@ -189,7 +189,7 @@ def build_database():
     """Main entry point: read CSV, clean, load into SQLite."""
     if not CSV_PATH.exists():
         print(f"ERROR: CSV not found at {CSV_PATH}")
-        print("Run: kaggle datasets download -d alitaqishah/ai-jobs-market-2025-2026-salaries -p data_agent_project/data --unzip")
+        print("Run: kaggle datasets download -d alitaqishah/ai-jobs-market-2025-2026-salaries -p data --unzip")
         return
 
     print(f"Reading CSV: {CSV_PATH}")

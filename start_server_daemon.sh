@@ -3,7 +3,7 @@
 pkill -9 -f "llama_cpp.server" 2>/dev/null
 sleep 2
 
-cd /home/flow/shushu-internship-tool/data_agent_project
+cd /home/flow/ai-jobs-data-agent
 
 nohup python3 -m llama_cpp.server \
     --model /home/flow/models/Qwen3-4B-Q4_K_M.gguf \

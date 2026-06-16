@@ -13,8 +13,6 @@
 ## 快速开始
 
 ```bash
-cd data_agent_project
-
 # 1. 安装依赖
 pip install -r requirements.txt
 
@@ -31,10 +29,77 @@ streamlit run app.py
 
 打开 `http://localhost:8501`。
 
-## 详细文档
+## 配置说明
 
-- [data_agent_project/README.md](data_agent_project/README.md) — 完整使用说明
-- [data_agent_project/AGENT.md](data_agent_project/AGENT.md) — 技术开发文档
+1. 复制 `.env.example` 为 `.env`
+2. 编辑 `.env`，填入你的 API Key：
+   ```
+   DEEPSEEK_API_KEY=sk-your-key-here
+   ```
+3. 获取 DeepSeek API Key: https://platform.deepseek.com/
+
+## 双引擎配置
+
+### DeepSeek（云端）- 默认
+
+- 稳定，推荐用于演示
+- 需要网络和 API Key
+- Max tokens: 4096
+
+### 本地 GPU（llama.cpp）- 可选
+
+- 离线运行，数据保留在本地
+- 需要 GPU 和本地服务器
+
+在另一个终端启动 GPU 服务器：
+
+```bash
+LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:/tmp/llama-cuda-build/build/bin \
+  /tmp/llama-cuda-build/build/bin/llama-server \
+  --model ~/models/Qwen3VL-4B-Instruct-Q4_K_M.gguf \
+  --mmproj ~/models/mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf \
+  --host 127.0.0.1 --port 8080 --ctx-size 4096 -ngl 99
+```
+
+然后在 UI 侧边栏选择 "Local GPU"。
+
+## 命令行使用
+
+```bash
+# DeepSeek（默认）
+python3 scripts/data_agent.py -q "What are the top 5 skills?"
+
+# 本地 GPU
+python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
+```
+
+## 项目结构
+
+```
+├── .env.example          # 环境配置模板
+├── .gitignore            # Git 忽略规则
+├── AGENT.md              # 技术开发文档
+├── README.md             # 本文件
+├── requirements.txt      # Python 依赖
+├── db/
+│   └── ai_jobs.db        # SQLite 数据库（生成）
+├── data/
+│   └── ai_jobs_market_2025_2026.csv  # 数据集
+├── scripts/
+│   ├── init_db.py        # 数据导入
+│   └── data_agent.py     # SQL Agent（带重试）
+└── app.py                # Streamlit Web UI
+```
+
+## 数据库结构
+
+| 表名 | 行数 | 说明 |
+|------|------|------|
+| job_postings | 1,500 | 岗位信息（薪资、技能、地点） |
+| job_skills | 9,548 | 技能关联表 |
+| job_categories | 12 | 类别统计 |
+| experience_levels | 4 | 经验要求统计 |
+| location_summary | 20 | 地点统计 |
 
 ## License
 
