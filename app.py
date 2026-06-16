@@ -39,7 +39,9 @@ SQL_RULES = """RULES:
 - Use LOWER(col) LIKE LOWER('%keyword%') for text search.
 - JOIN job_skills js ON jp.job_id = js.job_id for skill analysis.
 - Use English aliases for columns (AS "English Label") so chart labels are readable.
-- Output ONLY the SQL query."""
+- Keep SQL SHORT. Max 30 lines. Use simple WHERE conditions, not 100+ OR chains.
+- Do NOT include comments or explanations. Output ONLY the SQL query.
+- Do NOT wrap in markdown code blocks."""
 
 SAMPLE_QUESTIONS = {
     "Salary Analysis": [
@@ -109,6 +111,9 @@ def get_table_dataframe(table_name: str, limit: int = 100) -> pd.DataFrame:
         return pd.read_sql_query(f"SELECT * FROM [{table_name}] LIMIT {limit}", conn)
 
 
+MAX_SQL_LENGTH = 2000
+
+
 def clean_llm_output(text: str) -> str:
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     text = re.sub(r'<think>.*', '', text, flags=re.DOTALL)
@@ -118,9 +123,21 @@ def clean_llm_output(text: str) -> str:
 
 def extract_sql(text: str) -> str:
     text = clean_llm_output(text)
+    # Try to extract from markdown code block
     m = re.search(r'```(?:sql)?\s*\n?(.*?)```', text, re.DOTALL)
     if m:
         text = m.group(1)
+    else:
+        # No closing fence — take from first SQL keyword to end
+        m2 = re.search(r'(WITH\s|SELECT\s)', text, re.IGNORECASE)
+        if m2:
+            text = text[m2.start():]
+    # Strip comments
+    text = re.sub(r'--[^\n]*', '', text)
+    text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+    # Truncate if too long
+    if len(text) > MAX_SQL_LENGTH:
+        text = text[:MAX_SQL_LENGTH]
     return text.strip().rstrip(";")
 
 
