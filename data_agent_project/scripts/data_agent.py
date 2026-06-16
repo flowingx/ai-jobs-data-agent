@@ -35,8 +35,32 @@ job_categories(category TEXT, job_count INTEGER, avg_salary REAL, avg_demand_sco
 
 experience_levels(level TEXT, job_count INTEGER, avg_salary REAL, avg_years_experience REAL)
 
-location_summary(country TEXT, city TEXT, job_count INTEGER, avg_salary REAL)
-"""
+location_summary(country TEXT, city TEXT, job_count INTEGER, avg_salary REAL)"""
+
+SQL_RULES = """SECURITY: You are FORBIDDEN from generating CREATE TABLE, DROP TABLE, ALTER TABLE, INSERT, UPDATE, or DELETE. Output ONLY SELECT queries. The database must remain 100% Read-Only.
+
+ADVANCED SQL RULES:
+
+1. MANDATORY CTE FOR DYNAMIC FEATURES: If the user asks for a categorization, grouping, or flag that does not exist in the base tables (e.g., classifying "Senior" vs "Junior" based on years_of_experience, or grouping specific tech stacks), you MUST use a Common Table Expression (WITH clause) to create a virtual table in memory.
+
+   Template:
+   WITH DynamicCategorization AS (
+       SELECT *,
+           CASE
+               WHEN LOWER(required_skills) LIKE '%python%' THEN 'Python Stack'
+               ELSE 'Other'
+           END AS custom_category
+       FROM job_postings
+   )
+   SELECT custom_category, AVG(annual_salary_usd) FROM DynamicCategorization GROUP BY custom_category;
+
+2. FUZZY TEXT MATCHING: Always use LOWER(column) LIKE LOWER('%keyword%') for text searches instead of exact = matching.
+
+3. SKILL ANALYSIS: JOIN job_postings jp ON jp.job_id = js.job_id with job_skills js. Use GROUP BY with ORDER BY for aggregations.
+
+4. AGGREGATIONS: Use GROUP BY with ORDER BY. annual_salary_usd is in USD. remote_work values: 'On-site', 'Hybrid', 'Fully Remote'.
+
+5. Output ONLY the SQL query, nothing else. No explanation, no markdown, no thinking tags."""
 
 
 def get_llm():
@@ -97,16 +121,11 @@ def extract_sql(text: str) -> str:
 def generate_sql_with_llm(llm, question: str, error_hint: str = "") -> str:
     error_section = f"\nPrevious SQL failed: {error_hint}\nGenerate a DIFFERENT valid SQL query." if error_hint else ""
     messages = [
-        SystemMessage(content=f"""You are a SQLite expert. Generate ONLY a SELECT query. No explanation.
+        SystemMessage(content=f"""You are a SQLite expert.
 
 {SCHEMA_HINT}
 
-Rules:
-- Output ONLY the SQL, nothing else.
-- For skills analysis: JOIN job_postings jp ON jp.job_id = js.job_id
-- Use GROUP BY with ORDER BY for aggregations.
-- annual_salary_usd is in USD.
-- remote_work values: 'On-site', 'Hybrid', 'Fully Remote'
+{SQL_RULES}
 {error_section}"""),
         HumanMessage(content=f"Question: {question}")
     ]
