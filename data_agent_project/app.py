@@ -45,24 +45,19 @@ ADVANCED SQL RULES:
 
 1. CTE IS REQUIRED (MANDATORY) FOR DYNAMIC FEATURES: Whenever the user asks for a categorization, grouping, or flag that does not exist as a column in the base tables (e.g., classifying "Senior" vs "Junior" based on years_of_experience, or grouping specific tech stacks), you MUST use a Common Table Expression (WITH clause) to create a virtual table in memory. DO NOT skip CTEs for these cases — they are mandatory.
 
-   Template:
-   WITH DynamicCategorization AS (
-       SELECT *,
-           CASE
-               WHEN LOWER(required_skills) LIKE '%python%' THEN 'Python Stack'
-               ELSE 'Other'
-           END AS custom_category
-       FROM job_postings
+2. CRITICAL CTE SYNTAX RULE: If you use a CTE, you MUST start the query with the WITH keyword, followed by the CTE name, the AS keyword, and an opening parenthesis (. NEVER output a closing parenthesis ) without starting with WITH ... AS (. EXACT TEMPLATE:
+   WITH VirtualTableName AS (
+       SELECT virtual_col1, virtual_col2 FROM source_table WHERE condition
    )
-   SELECT custom_category, AVG(annual_salary_usd) FROM DynamicCategorization GROUP BY custom_category;
+   SELECT * FROM VirtualTableName;
 
-2. FUZZY TEXT MATCHING: Always use LOWER(column) LIKE LOWER('%keyword%') for text searches instead of exact = matching.
+3. FUZZY TEXT MATCHING: Always use LOWER(column) LIKE LOWER('%keyword%') for text searches instead of exact = matching.
 
-3. SKILL ANALYSIS: JOIN job_postings jp ON jp.job_id = js.job_id with job_skills js. Use GROUP BY with ORDER BY for aggregations.
+4. SKILL ANALYSIS: JOIN job_postings jp ON jp.job_id = js.job_id with job_skills js. Use GROUP BY with ORDER BY for aggregations.
 
-4. AGGREGATIONS: Use GROUP BY with ORDER BY. annual_salary_usd is in USD. remote_work values: 'On-site', 'Hybrid', 'Fully Remote'.
+5. AGGREGATIONS: Use GROUP BY with ORDER BY. annual_salary_usd is in USD. remote_work values: 'On-site', 'Hybrid', 'Fully Remote'.
 
-5. Output ONLY the SQL query, nothing else. No explanation, no markdown, no thinking tags."""
+6. Output ONLY the SQL query, nothing else. No explanation, no markdown, no thinking tags."""
 
 SAMPLE_QUESTIONS = {
     "Salary Analysis": [
@@ -122,22 +117,29 @@ def clean_llm_output(text: str) -> str:
 
 def extract_sql(text: str) -> str:
     text = clean_llm_output(text)
+    # Remove markdown code blocks
     for prefix in ["```sql", "```"]:
         if text.startswith(prefix):
             text = text[len(prefix):]
     if text.endswith("```"):
         text = text[:-3]
     text = text.strip()
+    # Take first SELECT statement
     upper = text.upper()
     if "SELECT" in upper:
         idx = upper.index("SELECT")
         text = text[idx:]
+        # Find end of statement
         for end in [";", "\n\n", "\n--"]:
             end_idx = text.find(end)
             if end_idx > 0:
                 text = text[:end_idx]
                 break
-    return text.strip().rstrip(";")
+    text = text.strip().rstrip(";")
+    # Validate CTE syntax: if ) appears without WITH ... AS (, fix it
+    if ")" in text and "WITH" not in text.upper():
+        text = text.split(")")[0].strip()
+    return text
 
 
 def generate_sql_with_llm(llm, question: str, error_hint: str = "") -> str:
