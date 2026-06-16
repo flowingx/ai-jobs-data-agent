@@ -315,9 +315,11 @@ def main():
 
     with tab1:
         st.subheader("Natural Language Query")
-        question = st.text_input("Enter your question:", placeholder="e.g., What is the average salary for remote vs on-site AI jobs?")
+        with st.form("query_form", clear_on_submit=False):
+            question = st.text_input("Enter your question:", placeholder="e.g., What is the average salary for remote vs on-site AI jobs?")
+            submitted = st.form_submit_button("Search", type="primary")
 
-        if st.button("Search", type="primary") and question:
+        if submitted and question:
             with st.spinner(f"Analyzing with {engine}..."):
                 try:
                     llm = get_llm(engine_key)
