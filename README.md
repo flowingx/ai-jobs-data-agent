@@ -12,24 +12,6 @@
 
 ## 快速开始
 
-### 方式一：Docker（推荐）
-
-```bash
-# 1. 配置环境
-cp .env.example .env
-# 编辑 .env，填入 DeepSeek API Key
-
-# 2. 启动
-docker compose up -d
-
-# 3. 初始化数据库（首次运行）
-docker compose exec app python3 scripts/init_db.py
-```
-
-打开 `http://localhost:8501`。
-
-### 方式二：本地安装
-
 ```bash
 # 1. 安装依赖
 pip install -r requirements.txt
@@ -44,6 +26,8 @@ python3 scripts/init_db.py
 # 4. 启动
 streamlit run app.py
 ```
+
+打开 `http://localhost:8501`。
 
 ## 配置说明
 
@@ -94,8 +78,6 @@ python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
 ```
 ├── .env.example          # 环境配置模板
 ├── .gitignore
-├── Dockerfile
-├── docker-compose.yml
 ├── AGENT.md              # 技术开发文档
 ├── README.md             # 本文件
 ├── requirements.txt      # Python 依赖
