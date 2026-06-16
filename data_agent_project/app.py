@@ -1,149 +1,286 @@
+#!/usr/bin/env python3
+"""AI Jobs Market Data Analysis Agent - Streamlit Web UI with Visualization."""
+
+import json
 import os
-from pathlib import Path
-
-import streamlit as st
-import pandas as pd
+import re
 import sqlite3
+from pathlib import Path
+from typing import Optional
 
-from langchain_community.utilities import SQLDatabase
-from langchain_community.agent_toolkits import create_sql_agent
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import pandas as pd
+import streamlit as st
 from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
 
-DB_PATH = Path(__file__).parent / "db" / "careers.db"
+DB_PATH = Path(__file__).parent / "db" / "ai_jobs.db"
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://127.0.0.1:8080/v1")
+LLM_MODEL = os.getenv("LLM_MODEL", "local-model")
+LLM_API_KEY = os.getenv("LLM_API_KEY", "not-needed")
 
-st.set_page_config(page_title="求职数据分析智能体", page_icon="💼", layout="wide")
+SCHEMA_HINT = """You have these SQLite tables:
 
-st.title("💼 求职数据分析智能体")
-st.markdown("基于 LangChain + SQLite 的求职市场自然语言分析系统")
+job_postings(job_id TEXT PRIMARY KEY, job_title TEXT, job_category TEXT, experience_level TEXT,
+  years_of_experience INTEGER, education_required TEXT, annual_salary_usd INTEGER,
+  salary_min_usd INTEGER, salary_max_usd INTEGER, city TEXT, country TEXT,
+  remote_work TEXT, company_size TEXT, industry TEXT, required_skills TEXT,
+  ai_salary_premium_pct REAL, demand_score INTEGER, demand_growth_yoy_pct REAL,
+  benefits_score_10 REAL, posting_year INTEGER, posting_month INTEGER,
+  is_senior INTEGER, is_remote_friendly INTEGER, is_llm_role INTEGER, salary_tier TEXT)
 
+job_skills(id INTEGER PRIMARY KEY, job_id TEXT, skill TEXT)
 
-@st.cache_resource
-def load_llm():
-    return ChatOpenAI(
-        model=os.getenv("LLM_MODEL", "local-model"),
-        base_url=os.getenv("LLM_BASE_URL", "http://localhost:8080/v1"),
-        api_key="not-needed",
-        temperature=0,
-        max_tokens=2048,
-    )
+job_categories(category TEXT, job_count INTEGER, avg_salary REAL, avg_demand_score REAL)
 
+experience_levels(level TEXT, job_count INTEGER, avg_salary REAL, avg_years_experience REAL)
 
-@st.cache_resource
-def load_database():
-    if not DB_PATH.exists():
-        st.error(f"数据库不存在: {DB_PATH}")
-        st.info("请先运行: python scripts/generate_job_data.py")
-        st.stop()
-    return SQLDatabase.from_uri(f"sqlite:///{DB_PATH.as_posix()}")
-
-
-@st.cache_resource
-def load_agent(_llm, _db):
-    return create_sql_agent(llm=_llm, db=_db, agent_type="openai-tools", verbose=True)
-
-
-def get_table_info():
-    info = {}
-    with sqlite3.connect(str(DB_PATH)) as conn:
-        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        tables = [row[0] for row in cursor.fetchall()]
-        for table in tables:
-            count = conn.execute(f"SELECT COUNT(*) FROM [{table}]").fetchone()[0]
-            info[table] = count
-    return info
-
-
-def get_table_dataframe(table_name, limit=100):
-    with sqlite3.connect(str(DB_PATH)) as conn:
-        return pd.read_sql_query(f"SELECT * FROM [{table_name}] LIMIT {limit}", conn)
-
-
-def query_with_agent(agent, question):
-    result = agent.invoke({"input": question})
-    return result.get("output", "无法生成回答")
-
+location_summary(country TEXT, city TEXT, job_count INTEGER, avg_salary REAL)
+"""
 
 SAMPLE_QUESTIONS = {
-    "市场热度分析": [
-        "哪些技能在求职市场上最热门？",
-        "各技能的趋势评分如何？",
-        "AI相关岗位占比多少？",
+    "Salary Analysis": [
+        "What is the average salary for remote vs on-site AI jobs?",
+        "How does salary vary by experience level?",
+        "What is the salary range for Senior AI Engineer positions?",
+        "What is the average salary premium for AI roles by industry?",
     ],
-    "地域分布分析": [
-        "哪些城市的岗位最多？",
-        "北京和上海的岗位有什么差异？",
-        "广东有哪些类型的岗位？",
+    "Skill Demand": [
+        "Which skills appear most frequently in job postings?",
+        "How many jobs require Python skills?",
+        "What are the most in-demand AI skills?",
     ],
-    "薪资分析": [
-        "薪资最高的10个岗位是什么？",
-        "不同经验要求的薪资差异如何？",
-        "AI岗位和普通开发岗位薪资对比？",
-    ],
-    "公司分析": [
-        "哪些公司招聘岗位最多？",
-        "B轮公司的薪资范围是多少？",
-        "大厂和创业公司的岗位差异？",
-    ],
-    "技能匹配": [
-        "Python岗位需要哪些技能？",
-        "RAG相关的岗位有哪些？",
-        "应届生适合投递哪些岗位？",
+    "Job Market Overview": [
+        "What are the top 5 job categories by demand score?",
+        "Which cities have the most AI job openings?",
+        "What percentage of jobs are LLM-related roles?",
+        "How many total job postings are there?",
     ],
 }
 
 
+def execute_sql(sql: str) -> tuple[list, list, Optional[str]]:
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        cursor = conn.execute(sql)
+        columns = [desc[0] for desc in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
+        return columns, rows, None
+    except Exception as e:
+        return [], [], str(e)
+    finally:
+        conn.close()
+
+
+def get_table_info() -> dict:
+    info = {}
+    with sqlite3.connect(str(DB_PATH)) as conn:
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        for row in cursor.fetchall():
+            count = conn.execute(f"SELECT COUNT(*) FROM [{row[0]}]").fetchone()[0]
+            info[row[0]] = count
+    return info
+
+
+def get_table_dataframe(table_name: str, limit: int = 100) -> pd.DataFrame:
+    with sqlite3.connect(str(DB_PATH)) as conn:
+        return pd.read_sql_query(f"SELECT * FROM [{table_name}] LIMIT {limit}", conn)
+
+
+def clean_llm_output(text: str) -> str:
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    text = re.sub(r'<think>.*', '', text, flags=re.DOTALL)
+    text = re.sub(r'.*</think>', '', text, flags=re.DOTALL)
+    return text.strip()
+
+
+def extract_sql(text: str) -> str:
+    text = clean_llm_output(text)
+    for prefix in ["```sql", "```"]:
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+    upper = text.upper()
+    if "SELECT" in upper:
+        idx = upper.index("SELECT")
+        text = text[idx:]
+        for end in [";", "\n\n", "\n--"]:
+            end_idx = text.find(end)
+            if end_idx > 0:
+                text = text[:end_idx]
+                break
+    return text.strip().rstrip(";")
+
+
+def generate_sql_with_llm(llm, question: str, error_hint: str = "") -> str:
+    error_section = f"\nPrevious SQL failed: {error_hint}\nGenerate a DIFFERENT valid SQL query." if error_hint else ""
+    messages = [
+        SystemMessage(content=f"""You are a SQLite expert. Generate ONLY a SELECT query. No explanation.
+
+{SCHEMA_HINT}
+
+Rules:
+- Output ONLY the SQL, nothing else.
+- For skills analysis: JOIN job_postings jp ON jp.job_id = js.job_id
+- Use GROUP BY with ORDER BY for aggregations.
+{error_section}"""),
+        HumanMessage(content=f"Question: {question}")
+    ]
+    response = llm.invoke(messages)
+    raw = response.content if hasattr(response, "content") else str(response)
+    return extract_sql(raw)
+
+
+def summarize_with_llm(llm, question: str, sql: str, columns: list, rows: list) -> str:
+    rows_sample = rows[:15]
+    messages = [
+        SystemMessage(content="Summarize the SQL results in 1-2 sentences. Be concise. No thinking tags."),
+        HumanMessage(content=f"Question: {question}\nSQL: {sql}\nColumns: {columns}\nResults: {json.dumps(rows_sample, default=str, ensure_ascii=False)}")
+    ]
+    response = llm.invoke(messages)
+    raw = response.content if hasattr(response, "content") else str(response)
+    return clean_llm_output(raw)
+
+
+def auto_detect_chart(sql: str, columns: list, rows: list) -> str:
+    sql_upper = sql.upper()
+    if "GROUP BY" in sql_upper and "COUNT" in sql_upper:
+        return "pie" if len(rows) <= 8 else "bar"
+    if any(fn in sql_upper for fn in ["AVG", "SUM", "MIN", "MAX"]):
+        return "bar"
+    if "ORDER BY" in sql_upper and len(rows) <= 20:
+        return "bar"
+    return None
+
+
+def render_chart(chart_type: str, columns: list, rows: list, title: str):
+    if not rows or not columns:
+        return
+    plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+    df = pd.DataFrame(rows, columns=columns)
+
+    if chart_type == "bar" and len(columns) >= 2:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        x_col, y_col = columns[0], columns[1]
+        try:
+            df[y_col] = pd.to_numeric(df[y_col])
+        except (ValueError, TypeError):
+            pass
+        d = df.head(20).copy()
+        d[x_col] = d[x_col].astype(str).str[:30]
+        ax.barh(d[x_col], d[y_col])
+        ax.set_xlabel(y_col)
+        ax.set_title(title)
+        ax.invert_yaxis()
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
+    elif chart_type == "pie" and len(columns) >= 2:
+        fig, ax = plt.subplots(figsize=(8, 8))
+        x_col, y_col = columns[0], columns[1]
+        try:
+            df[y_col] = pd.to_numeric(df[y_col])
+        except (ValueError, TypeError):
+            pass
+        d = df.head(10).copy()
+        ax.pie(d[y_col], labels=d[x_col], autopct="%1.1f%%", startangle=90)
+        ax.set_title(title)
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
+
+
 def main():
-    llm = load_llm()
-    db = load_database()
-    agent = load_agent(llm, db)
+    st.set_page_config(page_title="AI Jobs Market Analysis Agent", page_icon="🤖", layout="wide")
+    st.title("🤖 AI Jobs Market Data Analysis Agent")
+    st.markdown("Natural language analysis of 2025-2026 AI job market data using LangChain + SQLite + Local LLM")
 
     with st.sidebar:
-        st.header("📊 数据库概览")
-        table_info = get_table_info()
-        for table, count in table_info.items():
-            st.metric(table, f"{count} 条")
-
+        st.header("📊 Database Overview")
+        if DB_PATH.exists():
+            for table, count in get_table_info().items():
+                st.metric(table, f"{count:,} rows")
+        else:
+            st.error("Database not found. Run: `python3 scripts/init_db.py`")
         st.divider()
-        st.header("⚙️ 配置")
-        base_url = st.text_input("LLM API URL", value=os.getenv("LLM_BASE_URL", "http://localhost:8080/v1"))
-        model_name = st.text_input("模型名称", value=os.getenv("LLM_MODEL", "local-model"))
-        if base_url != os.getenv("LLM_BASE_URL", "http://localhost:8080/v1") or \
-           model_name != os.getenv("LLM_MODEL", "local-model"):
-            os.environ["LLM_BASE_URL"] = base_url
-            os.environ["LLM_MODEL"] = model_name
-            st.rerun()
+        llm_url = st.text_input("LLM Server URL", value=LLM_BASE_URL)
+        st.caption("Ensure LLM server is running (see AGENT.md)")
 
-    tab1, tab2, tab3 = st.tabs(["💬 智能查询", "📋 数据浏览", "📈 预设分析"])
+    tab1, tab2, tab3 = st.tabs(["🔍 Smart Query", "📋 Data Browser", "📈 Preset Analysis"])
 
     with tab1:
-        st.subheader("自然语言查询")
-        question = st.text_input("输入您的问题：", placeholder="例如：哪些技能在求职市场上最热门？")
-        if st.button("🔍 查询", type="primary") and question:
-            with st.spinner("正在分析..."):
-                answer = query_with_agent(agent, question)
-            st.success("查询完成！")
-            st.markdown("### 回答")
-            st.markdown(answer)
+        st.subheader("Natural Language Query")
+        question = st.text_input("Enter your question:", placeholder="e.g., What is the average salary for remote vs on-site AI jobs?")
+
+        if st.button("Search", type="primary") and question:
+            with st.spinner("Analyzing with LLM..."):
+                try:
+                    llm = ChatOpenAI(model=LLM_MODEL, base_url=llm_url, api_key=LLM_API_KEY, temperature=0, max_tokens=512)
+                    sql, columns, rows, error = None, [], [], None
+                    for attempt in range(3):
+                        error_hint = f"\nPrevious SQL failed: {error}\nGenerate a DIFFERENT valid SQL query." if error else ""
+                        sql = generate_sql_with_llm(llm, question, error_hint)
+                        columns, rows, error = execute_sql(sql)
+                        if not error:
+                            break
+
+                    if error:
+                        st.error(f"SQL Error: {error}")
+                        st.code(sql, language="sql")
+                    else:
+                        st.success("Query executed successfully")
+                        st.code(sql, language="sql")
+                        df = pd.DataFrame(rows, columns=columns)
+                        st.dataframe(df, use_container_width=True)
+                        chart_type = auto_detect_chart(sql, columns, rows)
+                        if chart_type and rows:
+                            st.subheader("📊 Visualization")
+                            render_chart(chart_type, columns, rows, question)
+                        if rows:
+                            st.subheader("💡 AI Summary")
+                            st.markdown(summarize_with_llm(llm, question, sql, columns, rows))
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+                    st.info("Make sure the LLM server is running (see AGENT.md)")
 
     with tab2:
-        st.subheader("数据浏览")
-        tables = list(table_info.keys())
-        selected_table = st.selectbox("选择表", tables)
-        if selected_table:
-            df = get_table_dataframe(selected_table, limit=100)
-            st.dataframe(df, use_container_width=True)
-            st.markdown(f"**表共 {table_info[selected_table]} 条记录，显示前 100 条**")
+        st.subheader("Data Browser")
+        if DB_PATH.exists():
+            tables = list(get_table_info().keys())
+            selected = st.selectbox("Select table", tables)
+            if selected:
+                df = get_table_dataframe(selected, limit=200)
+                st.dataframe(df, use_container_width=True)
+                st.caption(f"Showing up to 200 of {get_table_info()[selected]:,} rows")
 
     with tab3:
-        st.subheader("预设分析场景")
+        st.subheader("Preset Analysis Scenarios")
         for category, questions in SAMPLE_QUESTIONS.items():
-            with st.expander(f"📊 {category}", expanded=False):
+            with st.expander(f"📁 {category}", expanded=False):
                 for q in questions:
-                    if st.button(q, key=q):
-                        with st.spinner("正在查询..."):
-                            answer = query_with_agent(agent, q)
-                        st.markdown(f"**问题：** {q}")
-                        st.markdown(f"**回答：** {answer}")
+                    if st.button(q, key=f"preset_{q}"):
+                        with st.spinner("Querying..."):
+                            try:
+                                llm = ChatOpenAI(model=LLM_MODEL, base_url=llm_url, api_key=LLM_API_KEY, temperature=0, max_tokens=512)
+                                sql = generate_sql_with_llm(llm, q)
+                                columns, rows, error = execute_sql(sql)
+                                if not error and rows:
+                                    st.markdown(f"**Question:** {q}")
+                                    st.code(sql, language="sql")
+                                    st.dataframe(pd.DataFrame(rows, columns=columns), use_container_width=True)
+                                    chart_type = auto_detect_chart(sql, columns, rows)
+                                    if chart_type:
+                                        render_chart(chart_type, columns, rows, q)
+                                    st.markdown(f"**Answer:** {summarize_with_llm(llm, q, sql, columns, rows)}")
+                                else:
+                                    st.error(f"Error: {error}" if error else "No results")
+                            except Exception as e:
+                                st.error(f"Error: {str(e)}")
 
 
 if __name__ == "__main__":

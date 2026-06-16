@@ -1,61 +1,79 @@
-# 求职数据分析智能体
+# AI Jobs Market Data Analysis Agent
 
-基于 LangChain + SQLite + llama.cpp 的求职市场自然语言分析系统。
-在 shushu-internship-tool（鼠鼠实习妙妙工具）开源项目基础上改造。
+Natural language analysis of 2025-2026 AI job market data using LangChain + SQLite + Qwen3-4B (local LLM).
 
-## 功能特性
+## Features
 
-- **自然语言查询**：输入中文问题，自动生成 SQL 查询求职数据
-- **市场热度分析**：技能需求排名、趋势评分
-- **地域分布**：各省市岗位分布
-- **薪资分析**：不同类目/经验的薪资对比
-- **技能匹配**：岗位所需技能分析
+- **Natural Language Query**: Ask questions in English, get SQL-generated answers
+- **Multi-Query Fallback**: Retries SQL generation up to 3 times with error context
+- **Auto Visualization**: Bar charts, pie charts, or line charts based on query results
+- **AI Summaries**: LLM generates natural language explanations of results
+- **Data Browser**: Browse all database tables in the web UI
+- **Preset Analysis**: 12+ pre-configured analysis scenarios
 
-## 快速开始
+## Quick Start
 
 ```bash
-# 1. 安装依赖
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. 生成数据库（200条岗位数据）
-python scripts/generate_job_data.py
+# 2. Download dataset (if not already done)
+kaggle datasets download -d alitaqishah/ai-jobs-market-2025-2026-salaries -p data --unzip
 
-# 3. 生成可视化图表
-python scripts/visualize.py
+# 3. Initialize database
+python3 scripts/init_db.py
 
-# 4. 启动 LLM 服务
-python start_server.py
+# 4. Start LLM server (in a separate terminal - see AGENT.md for exact command)
+# The server must be running at http://127.0.0.1:8080/v1
 
-# 5. 测试 Agent
-python scripts/data_agent.py --question "哪些技能最热门？"
-
-# 6. 启动 Web 界面
+# 5. Start web interface
 streamlit run app.py
 ```
 
-## 数据库结构
+## Database Schema
 
-| 表名 | 说明 |
-|------|------|
-| raw_jobs | 岗位信息（200条） |
-| job_skill_map | 岗位-技能映射 |
-| project_templates | 项目模板 |
-| project_skill_map | 项目-技能映射 |
-| learning_resources | 学习资源 |
-| skill_trends | 技能趋势 |
+| Table | Rows | Description |
+|-------|------|-------------|
+| job_postings | 1,500 | Job listings with salary, skills, location |
+| job_skills | 9,548 | Normalized skill records |
+| job_categories | ~10 | Aggregated stats by category |
+| experience_levels | ~8 | Aggregated stats by experience |
+| location_summary | ~50 | Aggregated stats by location |
 
-## 项目结构
+## Project Structure
 
 ```
 data_agent_project/
-├── data/charts/          # 可视化图表
-├── db/careers.db         # SQLite 数据库
-├── models/               # Qwen3-4B 模型
+├── db/ai_jobs.db                  # SQLite database
+├── data/
+│   └── ai_jobs_market_2025_2026.csv  # Source dataset
 ├── scripts/
-│   ├── generate_job_data.py  # 数据生成
-│   ├── data_agent.py         # LangChain Agent
-│   └── visualize.py          # 可视化
-├── app.py                # Streamlit 界面
-├── start_server.py       # llama-server 启动
-└── requirements.txt
+│   ├── init_db.py                 # Data ingestion (CSV → SQLite)
+│   └── data_agent.py              # SQL Agent with fallback
+├── app.py                         # Streamlit web UI
+├── AGENT.md                       # LLM server config (user-managed)
+├── requirements.txt               # Dependencies
+├── PROJECT_PLAN.md                # Architecture docs
+└── README.md                      # This file
 ```
+
+## Agent Architecture
+
+1. **SQL Generation**: LLM converts natural language to SQL using database schema
+2. **Execution**: SQL executed against SQLite
+3. **Fallback**: If SQL fails, retry with error context (up to 3 attempts)
+4. **Visualization**: Auto-detect chart type (bar/pie/line) based on query
+5. **Summary**: LLM generates natural language explanation
+
+## Configuration
+
+Environment variables:
+- `LLM_BASE_URL`: LLM API URL (default: `http://127.0.0.1:8080/v1`)
+- `LLM_MODEL`: Model name (default: `local-model`)
+- `LLM_API_KEY`: API key (default: `not-needed` for local)
+
+**Note:** The LLM server is managed by the user in a separate terminal. See `AGENT.md` for startup command.
+
+## License
+
+Apache-2.0

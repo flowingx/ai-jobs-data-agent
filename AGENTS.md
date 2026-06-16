@@ -39,6 +39,8 @@ skills/shushu-internship-tool/scripts/shushu_internship_tool/
 
 Entry points (after install): `shushu-repo-audit`, `shushu-candidate-score`, `shushu-interview-pack`.
 
+Workflow references live at `skills/shushu-internship-tool/references/` (rubric, modification playbook, interview template, remote-compute checklist). `SKILL.md` reads these at runtime.
+
 ## Tests
 
 Tests live in `tests/`. The fixture repo `tests/fixtures/tiny_ai_project/` is used by `test_repo_audit.py` — avoid modifying it casually.
@@ -50,6 +52,7 @@ Tests live in `tests/`. The fixture repo `tests/fixtures/tiny_ai_project/` is us
 - `pyproject.toml` sets `pythonpath = ["skills/shushu-internship-tool/scripts"]` and `testpaths = ["tests"]`. Source import path is `shushu_internship_tool.*`, not a top-level package.
 - `candidate_score.py` does **not** parse natural-language preferences. The AI agent must write structured fields (`matched_jd_terms`, `license_score`, `runnable_score`, `resource_fit_score`) and pass `--taste taste.json` with `prefer_tags`/`avoid_tags`.
 - The skill workflow (in `SKILL.md`) requires structured user-input controls (yes/no gate, A/B/C/D options) — do not simulate these as plain text.
+- `test_skill_instructions.py` validates exact strings in `SKILL.md` and `openai.yaml`. Editing those files can break tests — run `pytest` after changes.
 - No CI, no pre-commit hooks, no GitHub Actions.
 
 ## Out of Scope
