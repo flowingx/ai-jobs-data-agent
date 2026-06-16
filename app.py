@@ -371,6 +371,20 @@ def render_chart(chart_type: str, columns: list, rows: list, title: str, sql: st
 
 def main():
     st.set_page_config(page_title="AI Jobs Market Analysis Agent", page_icon="chart_with_upwards_trend", layout="wide")
+
+    st.markdown("""
+    <style>
+    div[data-testid="stForm"] {
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        background: white;
+        padding: 10px 0;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.title("AI Jobs Market Data Analysis Agent")
     st.markdown("Natural language analysis of 2025-2026 AI job market data using LangChain + SQLite + LLM")
 
