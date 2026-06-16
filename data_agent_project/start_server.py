@@ -1,60 +1,75 @@
+#!/usr/bin/env python3
+"""Start llama.cpp server with Qwen3-4B model (OpenAI-compatible API)."""
+
 import os
-import subprocess
 import sys
 import time
+import signal
+import subprocess
 from pathlib import Path
 
-LLAMA_SERVER = r"C:\Users\flow\AppData\Local\Microsoft\WinGet\Packages\ggml.llamacpp_Microsoft.Winget.Source_8wekyb3d8bbwe\llama-server.exe"
-MODEL_PATH = Path(__file__).parent / "models" / "Qwen3-4B-Q4_K_M.gguf"
-HOST = "0.0.0.0"
-PORT = 8080
+MODEL_PATH = os.getenv(
+    "LLM_MODEL_PATH",
+    str(Path(__file__).parent.parent.parent / "models" / "Qwen3-4B-Q4_K_M.gguf"),
+)
+HOST = os.getenv("LLM_HOST", "0.0.0.0")
+PORT = int(os.getenv("LLM_PORT", "8080"))
+N_GPU_LAYERS = int(os.getenv("LLM_N_GPU_LAYERS", "99"))
+N_CTX = int(os.getenv("LLM_N_CTX", "4096"))
 
 
-def start_server():
-    if not Path(LLAMA_SERVER).exists():
-        print(f"llama-server not found at: {LLAMA_SERVER}")
-        sys.exit(1)
-
-    if not MODEL_PATH.exists():
-        print(f"Model not found at: {MODEL_PATH}")
-        print("Please download the model first.")
+def main():
+    if not Path(MODEL_PATH).exists():
+        print(f"ERROR: Model not found at {MODEL_PATH}")
+        print("Set LLM_MODEL_PATH environment variable to your GGUF model path.")
         sys.exit(1)
 
     cmd = [
-        LLAMA_SERVER,
-        "-m", str(MODEL_PATH),
+        sys.executable, "-m", "llama_cpp.server",
+        "--model", MODEL_PATH,
         "--host", HOST,
         "--port", str(PORT),
-        "-ngl", "99",
-        "--ctx-size", "4096",
+        "--n_gpu_layers", str(N_GPU_LAYERS),
+        "--n_ctx", str(N_CTX),
     ]
 
-    print(f"Starting llama-server...")
-    print(f"  Model: {MODEL_PATH.name}")
+    print("=" * 60)
+    print("Starting LLM Server")
+    print(f"  Model: {MODEL_PATH}")
     print(f"  Address: http://{HOST}:{PORT}")
-    print(f"  GPU layers: 99 (full offload)")
-    print()
+    print(f"  GPU Layers: {N_GPU_LAYERS}")
+    print(f"  Context: {N_CTX}")
+    print("=" * 60)
 
-    proc = subprocess.Popen(cmd)
+    proc = subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stderr)
 
-    print("Waiting for server to start...")
-    time.sleep(5)
+    def shutdown(sig, frame):
+        print("\nShutting down server...")
+        proc.terminate()
+        proc.wait()
+        sys.exit(0)
 
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
+
+    print("Waiting for server to be ready...")
     import urllib.request
-    try:
-        resp = urllib.request.urlopen(f"http://localhost:{PORT}/health")
-        print(f"Server health: {resp.read().decode()}")
-        print("\nServer is ready!")
-    except Exception as e:
-        print(f"Server may still be loading: {e}")
+    for i in range(120):
+        time.sleep(2)
+        try:
+            urllib.request.urlopen(f"http://localhost:{PORT}/v1/models", timeout=2)
+            print(f"\nServer ready at http://localhost:{PORT}")
+            print("Press Ctrl+C to stop.")
+            proc.wait()
+            return
+        except Exception:
+            if i % 5 == 0:
+                print(f"  Waiting... ({i * 2}s)")
 
-    return proc
+    print("ERROR: Server failed to start within 240 seconds.")
+    proc.terminate()
+    sys.exit(1)
 
 
 if __name__ == "__main__":
-    proc = start_server()
-    try:
-        proc.wait()
-    except KeyboardInterrupt:
-        print("\nShutting down...")
-        proc.terminate()
+    main()
