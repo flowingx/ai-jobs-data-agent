@@ -57,7 +57,9 @@ ADVANCED SQL RULES:
 
 5. AGGREGATIONS: Use GROUP BY with ORDER BY. annual_salary_usd is in USD. remote_work values: 'On-site', 'Hybrid', 'Fully Remote'.
 
-6. Output ONLY the SQL query, nothing else. No explanation, no markdown, no thinking tags."""
+6. Output ONLY the SQL query, nothing else. No explanation, no markdown, no thinking tags.
+
+7. For non-English questions (Chinese, etc.): Ignore the language of the question. Focus on the MEANING and generate SQL using the English column names from the schema. The database stores English data regardless of the question language."""
 
 SAMPLE_QUESTIONS = {
     "Salary Analysis": [
@@ -139,6 +141,11 @@ def extract_sql(text: str) -> str:
     # Validate CTE syntax: if ) appears without WITH ... AS (, fix it
     if ")" in text and "WITH" not in text.upper():
         text = text.split(")")[0].strip()
+    # Truncation guard: if SQL ends mid-expression, return empty
+    if text and not text.rstrip().endswith(";") and not text.rstrip().endswith(")"):
+        last_word = text.rstrip().split()[-1].upper() if text.rstrip().split() else ""
+        if last_word in ("LIKE", "AND", "OR", "ON", "WHERE", "SET", "VALUES", "THEN", "ELSE", "WHEN"):
+            text = ""
     return text
 
 
@@ -289,7 +296,7 @@ def main():
                     if st.button(q, key=f"preset_{q}"):
                         with st.spinner("Querying..."):
                             try:
-                                llm = ChatOpenAI(model=LLM_MODEL, base_url=llm_url, api_key=LLM_API_KEY, temperature=0, max_tokens=512)
+                                llm = ChatOpenAI(model=LLM_MODEL, base_url=llm_url, api_key=LLM_API_KEY, temperature=0, max_tokens=1024)
                                 sql = generate_sql_with_llm(llm, q)
                                 columns, rows, error = execute_sql(sql)
                                 if not error and rows:
