@@ -10,15 +10,26 @@ User Question → LLM SQL Generation → SQLite Execution → Results + Visualiz
   Natural Language Summary ←────────────── Query Results
 ```
 
-## Environment Variables
+## Dual-Engine Setup
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DEEPSEEK_API_KEY` | (required for cloud) | DeepSeek API key |
-| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek API endpoint |
-| `DEEPSEEK_MODEL` | `deepseek-chat` | DeepSeek model name |
-| `LOCAL_LLM_URL` | `http://127.0.0.1:8080/v1` | Local llama.cpp endpoint |
-| `LOCAL_MODEL` | `local-model` | Local model name |
+| Engine | Default | Max Tokens | API Key Required |
+|--------|---------|------------|------------------|
+| DeepSeek (Cloud) | Yes | 4096 | Yes |
+| Local GPU (llama.cpp) | Optional | 1024 | No |
+
+## Configuration
+
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and fill in your DeepSeek API key:
+   ```env
+   DEEPSEEK_API_KEY=sk-your-key-here
+   ```
+
+3. Get a DeepSeek API key at: https://platform.deepseek.com/
 
 ## LLM Server Commands
 
@@ -56,6 +67,16 @@ LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:/tmp/llama-cuda-build/build/bin \
 - **Multi-query Fallback**: Retries up to 3 times with error context
 - **Visualization**: Auto-detects chart type from SQL patterns
 - **Summary**: LLM generates natural language explanation
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DEEPSEEK_API_KEY` | (required for cloud) | DeepSeek API key |
+| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek API endpoint |
+| `DEEPSEEK_MODEL` | `deepseek-chat` | DeepSeek model name |
+| `LOCAL_LLM_URL` | `http://127.0.0.1:8080/v1` | Local llama.cpp endpoint |
+| `LOCAL_MODEL` | `local-model` | Local model name |
 
 ## Dependencies
 
