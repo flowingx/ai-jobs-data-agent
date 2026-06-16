@@ -169,7 +169,7 @@ def auto_detect_chart(sql: str, columns: list, rows: list) -> str:
 def render_chart(chart_type: str, columns: list, rows: list, title: str):
     if not rows or not columns:
         return
-    plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
+    plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "WenQuanYi Micro Hei", "DejaVu Sans"]
     plt.rcParams["axes.unicode_minus"] = False
     df = pd.DataFrame(rows, columns=columns)
 
