@@ -1,49 +1,34 @@
-# AGENT.md - Data Analysis Agent Configuration
+# AGENT.md - Technical Developer Documentation
 
-## Dual-Engine Architecture
+## Architecture
 
-The agent supports two LLM backends:
-
-| Engine | Default | Max Tokens | Use Case |
-|--------|---------|------------|----------|
-| **DeepSeek (Cloud)** | ✅ Yes | 4096 | Stable, recommended for demos |
-| **Local GPU (llama.cpp)** | Optional | 1024 | Offline, data privacy |
-
-## Setup
-
-### 1. Environment Configuration
-
-```bash
-cd data_agent_project
-cp .env.example .env
+```
+User Question → LLM SQL Generation → SQLite Execution → Results + Visualization
+     ↓                                        ↓
+  (Fallback: retry with error context)    (Charts: bar/pie)
+     ↓                                        ↓
+  Natural Language Summary ←────────────── Query Results
 ```
 
-Edit `.env` and fill in your DeepSeek API key:
+## Environment Variables
 
-```env
-DEEPSEEK_API_KEY=sk-your-key-here
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DEEPSEEK_API_KEY` | (required for cloud) | DeepSeek API key |
+| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek API endpoint |
+| `DEEPSEEK_MODEL` | `deepseek-chat` | DeepSeek model name |
+| `LOCAL_LLM_URL` | `http://127.0.0.1:8080/v1` | Local llama.cpp endpoint |
+| `LOCAL_MODEL` | `local-model` | Local model name |
 
-### 2. Initialize Database
+## LLM Server Commands
 
-```bash
-python3 scripts/init_db.py
-```
+### DeepSeek (Cloud)
 
-### 3. Start Web UI
+No server needed. Just configure `.env` with your API key.
 
-```bash
-streamlit run app.py
-```
-
-Open `http://localhost:8501`. Use the sidebar radio button to switch engines.
-
-## Local GPU Mode (Optional)
-
-If you want to use the local llama.cpp server instead of DeepSeek:
+### Local GPU (llama.cpp)
 
 ```bash
-# Start the GPU server in a separate terminal:
 LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:/tmp/llama-cuda-build/build/bin \
   /tmp/llama-cuda-build/build/bin/llama-server \
   --model ~/models/Qwen3VL-4B-Instruct-Q4_K_M.gguf \
@@ -51,14 +36,36 @@ LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:/tmp/llama-cuda-build/build/bin \
   --host 127.0.0.1 --port 8080 --ctx-size 4096 -ngl 99
 ```
 
-Then select "Local GPU (llama.cpp)" in the UI sidebar.
-
-## CLI Usage
+### Local CPU (llama.cpp)
 
 ```bash
-# DeepSeek (default)
-python3 scripts/data_agent.py -q "What are the top 5 skills?"
+~/llama-cpp/llama-b9616/llama-server \
+  --model ~/models/Qwen3-4B-Q4_K_M.gguf \
+  --host 127.0.0.1 --port 8080 --ctx-size 4096
+```
 
-# Local GPU
-python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
+## Data Pipeline
+
+1. **Source**: `data/ai_jobs_market_2025_2026.csv` (1,500 rows from Kaggle)
+2. **Ingestion**: `scripts/init_db.py` → `db/ai_jobs.db`
+3. **Query**: `scripts/data_agent.py` or `app.py`
+
+## Agent Logic
+
+- **SQL Generation**: LLM converts natural language to SQL using schema context
+- **Multi-query Fallback**: Retries up to 3 times with error context
+- **Visualization**: Auto-detects chart type from SQL patterns
+- **Summary**: LLM generates natural language explanation
+
+## Dependencies
+
+```
+pandas>=1.5
+langchain>=0.2
+langchain-openai>=0.1
+openai>=1.0
+sqlalchemy>=2.0
+matplotlib>=3.7
+streamlit>=1.30
+python-dotenv>=1.0
 ```

@@ -125,10 +125,20 @@ def extract_sql(text: str) -> str:
 
 def generate_sql_with_llm(llm, question: str, error_hint: str = "") -> str:
     error_section = f"\nPrevious SQL failed: {error_hint}\nGenerate a DIFFERENT valid SQL query." if error_hint else ""
+    enhanced_system_prompt = f"""You are a senior SQLite expert for AI Job Market analysis.
+    {SCHEMA_HINT}
+    {SQL_RULES}
+
+    STRICT SEARCH STRATEGY:
+    1. FUZZY SEARCH: Never use '=' for text/string columns. ALWAYS use `LOWER(column) LIKE LOWER('%keyword%')`.
+    2. AMBIGUITY HANDLING: If a filter (like 'United States') doesn't exist, use the most logical column (e.g., 'country') or broad terms.
+    3. CTE MANDATORY: For categorizations (e.g., 'Senior' vs 'Junior') or dynamic grouping not in columns, use WITH CTE syntax.
+    4. NO-RESULT POLICY: If your query yields no results, the next attempt MUST broaden the filter (remove the year constraint, search description instead of title).
+    """
     messages = [
-        SystemMessage(content=f"You are a SQLite expert.\n\n{SCHEMA_HINT}\n\n{SQL_RULES}\n{error_section}"),
-        HumanMessage(content=f"Question: {question}")
-    ]
+            SystemMessage(content=enhanced_system_prompt),
+            HumanMessage(content=f"Question: {question}")
+        ]
     response = llm.invoke(messages)
     raw = response.content if hasattr(response, "content") else str(response)
     return extract_sql(raw)
@@ -195,12 +205,12 @@ def render_chart(chart_type: str, columns: list, rows: list, title: str):
 
 
 def main():
-    st.set_page_config(page_title="AI Jobs Market Analysis Agent", page_icon="🤖", layout="wide")
-    st.title("🤖 AI Jobs Market Data Analysis Agent")
+    st.set_page_config(page_title="AI Jobs Market Analysis Agent", page_icon="chart_with_upwards_trend", layout="wide")
+    st.title("AI Jobs Market Data Analysis Agent")
     st.markdown("Natural language analysis of 2025-2026 AI job market data using LangChain + SQLite + LLM")
 
     with st.sidebar:
-        st.header("🔧 LLM Engine")
+        st.header("LLM Engine")
         engine = st.radio("Select engine:", ["DeepSeek (Cloud)", "Local GPU (llama.cpp)"], index=0)
         engine_key = "deepseek" if "DeepSeek" in engine else "local"
 
@@ -214,14 +224,14 @@ def main():
             st.caption("Ensure local llama-server is running (see AGENT.md)")
 
         st.divider()
-        st.header("📊 Database Overview")
+        st.header("Database Overview")
         if DB_PATH.exists():
             for table, count in get_table_info().items():
                 st.metric(table, f"{count:,} rows")
         else:
             st.error("Database not found. Run: `python3 scripts/init_db.py`")
 
-    tab1, tab2, tab3 = st.tabs(["🔍 Smart Query", "📋 Data Browser", "📈 Preset Analysis"])
+    tab1, tab2, tab3 = st.tabs(["Smart Query", "Data Browser", "Preset Analysis"])
 
     with tab1:
         st.subheader("Natural Language Query")
@@ -250,10 +260,10 @@ def main():
                         st.dataframe(df, use_container_width=True)
                         chart_type = auto_detect_chart(sql, columns, rows)
                         if chart_type and rows:
-                            st.subheader("📊 Visualization")
+                            st.subheader("Visualization")
                             render_chart(chart_type, columns, rows, question)
                         if rows:
-                            st.subheader("💡 AI Summary")
+                            st.subheader("AI Summary")
                             st.markdown(summarize_with_llm(llm, question, sql, columns, rows))
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
@@ -275,7 +285,7 @@ def main():
     with tab3:
         st.subheader("Preset Analysis Scenarios")
         for category, questions in SAMPLE_QUESTIONS.items():
-            with st.expander(f"📁 {category}", expanded=False):
+            with st.expander(f"{category}", expanded=False):
                 for q in questions:
                     if st.button(q, key=f"preset_{q}"):
                         with st.spinner("Querying..."):

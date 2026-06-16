@@ -1,33 +1,101 @@
 # AI Jobs Market Data Analysis Agent
 
-Natural language analysis of 2025-2026 AI job market data using LangChain + SQLite + Qwen3-4B (local LLM).
+Natural language analysis of 2025-2026 AI job market data using LangChain + SQLite + LLM.
 
 ## Features
 
-- **Natural Language Query**: Ask questions in English, get SQL-generated answers
-- **Multi-Query Fallback**: Retries SQL generation up to 3 times with error context
-- **Auto Visualization**: Bar charts, pie charts, or line charts based on query results
-- **AI Summaries**: LLM generates natural language explanations of results
-- **Data Browser**: Browse all database tables in the web UI
-- **Preset Analysis**: 12+ pre-configured analysis scenarios
+- Natural language SQL queries (English or Chinese)
+- Dual-engine: DeepSeek (Cloud) or Local GPU (llama.cpp)
+- Auto visualization (bar/pie charts)
+- AI-powered summaries
+- 1,500 real AI job postings from Kaggle
 
 ## Quick Start
 
 ```bash
+cd data_agent_project
+
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Download dataset (if not already done)
-kaggle datasets download -d alitaqishah/ai-jobs-market-2025-2026-salaries -p data --unzip
+# 2. Configure environment
+cp .env.example .env
+# Edit .env and add your DeepSeek API key
 
 # 3. Initialize database
 python3 scripts/init_db.py
 
-# 4. Start LLM server (in a separate terminal - see AGENT.md for exact command)
-# The server must be running at http://127.0.0.1:8080/v1
-
-# 5. Start web interface
+# 4. Start web UI
 streamlit run app.py
+```
+
+Open `http://localhost:8501` in your browser.
+
+## How to Configure
+
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and fill in your API key:
+   ```env
+   DEEPSEEK_API_KEY=sk-your-key-here
+   ```
+
+3. Get a DeepSeek API key at: https://platform.deepseek.com/
+
+## Dual-Engine Setup
+
+### DeepSeek (Cloud) - Default
+
+- Stable, recommended for demos
+- Requires internet and API key
+- Max tokens: 4096
+
+### Local GPU (llama.cpp) - Optional
+
+- Offline, data stays private
+- Requires GPU and local server
+
+Start the GPU server in a separate terminal:
+
+```bash
+LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:/tmp/llama-cuda-build/build/bin \
+  /tmp/llama-cuda-build/build/bin/llama-server \
+  --model ~/models/Qwen3VL-4B-Instruct-Q4_K_M.gguf \
+  --mmproj ~/models/mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf \
+  --host 127.0.0.1 --port 8080 --ctx-size 4096 -ngl 99
+```
+
+Then select "Local GPU" in the UI sidebar.
+
+## CLI Usage
+
+```bash
+# DeepSeek (default)
+python3 scripts/data_agent.py -q "What are the top 5 skills?"
+
+# Local GPU
+python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
+```
+
+## Project Structure
+
+```
+data_agent_project/
+├── .env.example          # Environment config template
+├── .gitignore            # Git ignore rules
+├── AGENT.md              # Technical developer docs
+├── README.md             # This file
+├── requirements.txt      # Python dependencies
+├── db/ai_jobs.db         # SQLite database (generated)
+├── data/
+│   └── ai_jobs_market_2025_2026.csv  # Source dataset
+├── scripts/
+│   ├── init_db.py        # Data ingestion
+│   └── data_agent.py     # SQL Agent with fallback
+└── app.py                # Streamlit web UI
 ```
 
 ## Database Schema
@@ -36,43 +104,9 @@ streamlit run app.py
 |-------|------|-------------|
 | job_postings | 1,500 | Job listings with salary, skills, location |
 | job_skills | 9,548 | Normalized skill records |
-| job_categories | ~10 | Aggregated stats by category |
-| experience_levels | ~8 | Aggregated stats by experience |
-| location_summary | ~50 | Aggregated stats by location |
-
-## Project Structure
-
-```
-data_agent_project/
-├── db/ai_jobs.db                  # SQLite database
-├── data/
-│   └── ai_jobs_market_2025_2026.csv  # Source dataset
-├── scripts/
-│   ├── init_db.py                 # Data ingestion (CSV → SQLite)
-│   └── data_agent.py              # SQL Agent with fallback
-├── app.py                         # Streamlit web UI
-├── AGENT.md                       # LLM server config (user-managed)
-├── requirements.txt               # Dependencies
-├── PROJECT_PLAN.md                # Architecture docs
-└── README.md                      # This file
-```
-
-## Agent Architecture
-
-1. **SQL Generation**: LLM converts natural language to SQL using database schema
-2. **Execution**: SQL executed against SQLite
-3. **Fallback**: If SQL fails, retry with error context (up to 3 attempts)
-4. **Visualization**: Auto-detect chart type (bar/pie/line) based on query
-5. **Summary**: LLM generates natural language explanation
-
-## Configuration
-
-Environment variables:
-- `LLM_BASE_URL`: LLM API URL (default: `http://127.0.0.1:8080/v1`)
-- `LLM_MODEL`: Model name (default: `local-model`)
-- `LLM_API_KEY`: API key (default: `not-needed` for local)
-
-**Note:** The LLM server is managed by the user in a separate terminal. See `AGENT.md` for startup command.
+| job_categories | 12 | Aggregated stats by category |
+| experience_levels | 4 | Aggregated stats by experience |
+| location_summary | 20 | Aggregated stats by location |
 
 ## License
 
