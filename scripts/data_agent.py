@@ -35,7 +35,8 @@ SQL_RULES = """CRITICAL RULES:
 - Output ONLY the SQL query. No explanations, no comments, no markdown.
 - SELECT only. No CREATE/DROP/ALTER/INSERT/UPDATE/DELETE.
 - Max 15 lines of SQL. Use simple WHERE, never 100+ OR chains.
-- For skill search: use `js.skill = 'python'` or `js.skill LIKE '%python%'`, not OR chains.
+- For skill search in job_skills: use `js.skill = 'python'` (skills are individual rows).
+- For skill search in job_postings.required_skills: use `required_skills LIKE '%python%'` (pipe-delimited string like "Python|SQL|Cloud").
 - For job category: use `job_category = 'AI'`, not OR chains matching title words.
 - Use English column aliases (AS "Label") for chart readability.
 - NEVER repeat the same pattern with different values. Use a subquery or IN clause instead."""
