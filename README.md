@@ -6,9 +6,11 @@
 
 - 自然语言 SQL 查询（支持中英文）
 - 双引擎：DeepSeek（云端）或本地 GPU（llama.cpp）
-- 自动可视化（柱状图/饼图）
+- 多种图表：柱状图、饼图、折线图、散点图
 - AI 摘要生成
 - 1,500 条真实 AI 岗位数据（Kaggle 来源）
+- 8 个预置查询示例（直接执行，不依赖 LLM）
+- SQL 防幻觉机制（OR 链截断、长度限制）
 
 ## 快速开始
 
@@ -44,7 +46,7 @@ streamlit run app.py
 
 - 稳定，推荐用于演示
 - 需要网络和 API Key
-- Max tokens: 4096
+- Max tokens: 1024
 
 ### 本地 GPU（llama.cpp）- 可选
 
@@ -79,6 +81,7 @@ python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
 ├── .env.example          # 环境配置模板
 ├── .gitignore
 ├── AGENT.md              # 技术开发文档
+├── LICENSE               # Apache 2.0
 ├── README.md             # 本文件
 ├── requirements.txt      # Python 依赖
 ├── app.py                # Streamlit Web UI
@@ -98,11 +101,17 @@ python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
 | 表名 | 行数 | 说明 |
 |------|------|------|
 | job_postings | 1,500 | 岗位信息（薪资、技能、地点） |
-| job_skills | 9,548 | 技能关联表 |
+| job_skills | 9,548 | 技能关联表（每行一个技能） |
 | job_categories | 12 | 类别统计 |
 | experience_levels | 4 | 经验要求统计 |
 | location_summary | 20 | 地点统计 |
 
+## 数据格式说明
+
+- `job_skills.skill`：独立行存储（每行一个技能）
+- `job_postings.required_skills`：管道符分隔（如 `Python|SQL|Cloud`）
+- 搜索时统一使用 `LOWER(col) LIKE LOWER('%keyword%')` 忽略大小写
+
 ## License
 
-Apache-2.0
+Apache 2.0 - Copyright 2026 flowingx
