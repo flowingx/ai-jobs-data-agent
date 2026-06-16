@@ -151,23 +151,23 @@ def extract_sql(text: str) -> str:
     return text.strip().rstrip(";")
 
 
+def log_usage(tag: str, response):
+    usage = getattr(response, "usage_metadata", None)
+    if usage:
+        inp = usage.get("input_tokens", 0) or 0
+        out = usage.get("output_tokens", 0) or 0
+        total = usage.get("total_tokens", 0) or (inp + out)
+        print(f"  [{tag}] tokens: in={inp} out={out} total={total}")
+
+
 def generate_sql_with_llm(llm, question: str, error_hint: str = "") -> str:
     error_section = f"\nPrevious SQL failed: {error_hint}\nGenerate a DIFFERENT valid SQL query." if error_hint else ""
-    enhanced_system_prompt = f"""You are a senior SQLite expert for AI Job Market analysis.
-    {SCHEMA_HINT}
-    {SQL_RULES}
-
-    STRICT SEARCH STRATEGY:
-    1. FUZZY SEARCH: Never use '=' for text/string columns. ALWAYS use `LOWER(column) LIKE LOWER('%keyword%')`.
-    2. AMBIGUITY HANDLING: If a filter (like 'United States') doesn't exist, use the most logical column (e.g., 'country') or broad terms.
-    3. CTE MANDATORY: For categorizations (e.g., 'Senior' vs 'Junior') or dynamic grouping not in columns, use WITH CTE syntax.
-    4. NO-RESULT POLICY: If your query yields no results, the next attempt MUST broaden the filter (remove the year constraint, search description instead of title).
-    """
     messages = [
-            SystemMessage(content=enhanced_system_prompt),
-            HumanMessage(content=f"Question: {question}")
-        ]
+        SystemMessage(content=f"You are a SQLite expert.\n\n{SCHEMA_HINT}\n\n{SQL_RULES}\n{error_section}"),
+        HumanMessage(content=f"Question: {question}")
+    ]
     response = llm.invoke(messages)
+    log_usage("SQL", response)
     raw = response.content if hasattr(response, "content") else str(response)
     return extract_sql(raw)
 
@@ -179,6 +179,7 @@ def summarize_with_llm(llm, question: str, sql: str, columns: list, rows: list) 
         HumanMessage(content=f"Question: {question}\nSQL: {sql}\nColumns: {columns}\nResults: {json.dumps(rows_sample, default=str, ensure_ascii=False)}")
     ]
     response = llm.invoke(messages)
+    log_usage("Summary", response)
     raw = response.content if hasattr(response, "content") else str(response)
     return clean_llm_output(raw)
 

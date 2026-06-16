@@ -114,6 +114,15 @@ def extract_sql(text: str) -> str:
     return text.strip().rstrip(";")
 
 
+def log_usage(tag: str, response):
+    usage = getattr(response, "usage_metadata", None)
+    if usage:
+        inp = usage.get("input_tokens", 0) or 0
+        out = usage.get("output_tokens", 0) or 0
+        total = usage.get("total_tokens", 0) or (inp + out)
+        print(f"  [{tag}] tokens: in={inp} out={out} total={total}")
+
+
 def generate_sql_with_llm(llm, question: str, error_hint: str = "") -> str:
     error_section = f"\nPrevious SQL failed: {error_hint}\nGenerate a DIFFERENT valid SQL query." if error_hint else ""
     messages = [
@@ -121,6 +130,7 @@ def generate_sql_with_llm(llm, question: str, error_hint: str = "") -> str:
         HumanMessage(content=f"Question: {question}")
     ]
     response = llm.invoke(messages)
+    log_usage("SQL", response)
     raw = response.content if hasattr(response, "content") else str(response)
     return extract_sql(raw)
 
@@ -132,6 +142,7 @@ def summarize_with_llm(llm, question: str, sql: str, columns: list, rows: list) 
         HumanMessage(content=f"Question: {question}\nSQL: {sql}\nColumns: {columns}\nResults: {json.dumps(rows_sample, default=str, ensure_ascii=False)}")
     ]
     response = llm.invoke(messages)
+    log_usage("Summary", response)
     raw = response.content if hasattr(response, "content") else str(response)
     return clean_llm_output(raw)
 
