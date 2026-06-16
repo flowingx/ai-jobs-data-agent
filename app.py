@@ -204,7 +204,6 @@ def render_chart(chart_type: str, columns: list, rows: list, title: str):
         return
     plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "WenQuanYi Micro Hei", "DejaVu Sans"]
     plt.rcParams["axes.unicode_minus"] = False
-    plt.rcParams["axes.unicode_color"] = "#333333"
     df = pd.DataFrame(rows, columns=columns)
 
     fig = None
