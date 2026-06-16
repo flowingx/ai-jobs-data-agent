@@ -12,6 +12,24 @@
 
 ## 快速开始
 
+### 方式一：Docker（推荐）
+
+```bash
+# 1. 配置环境
+cp .env.example .env
+# 编辑 .env，填入 DeepSeek API Key
+
+# 2. 启动
+docker compose up -d
+
+# 3. 初始化数据库（首次运行）
+docker compose exec app python3 scripts/init_db.py
+```
+
+打开 `http://localhost:8501`。
+
+### 方式二：本地安装
+
 ```bash
 # 1. 安装依赖
 pip install -r requirements.txt
@@ -23,11 +41,9 @@ cp .env.example .env
 # 3. 初始化数据库
 python3 scripts/init_db.py
 
-# 4. 启动 Web UI
+# 4. 启动
 streamlit run app.py
 ```
-
-打开 `http://localhost:8501`。
 
 ## 配置说明
 
@@ -77,18 +93,22 @@ python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
 
 ```
 ├── .env.example          # 环境配置模板
-├── .gitignore            # Git 忽略规则
+├── .gitignore
+├── Dockerfile
+├── docker-compose.yml
 ├── AGENT.md              # 技术开发文档
 ├── README.md             # 本文件
 ├── requirements.txt      # Python 依赖
-├── db/
-│   └── ai_jobs.db        # SQLite 数据库（生成）
+├── app.py                # Streamlit Web UI
 ├── data/
-│   └── ai_jobs_market_2025_2026.csv  # 数据集
-├── scripts/
-│   ├── init_db.py        # 数据导入
-│   └── data_agent.py     # SQL Agent（带重试）
-└── app.py                # Streamlit Web UI
+│   ├── ai_jobs_market_2025_2026.csv
+│   └── charts/
+├── db/
+│   ├── ai_jobs.db        # SQLite 数据库（可重新生成）
+│   └── careers.db
+└── scripts/
+    ├── data_agent.py     # SQL Agent（带重试）
+    └── init_db.py        # 数据导入
 ```
 
 ## 数据库结构
