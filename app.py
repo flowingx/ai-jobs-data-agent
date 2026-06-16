@@ -355,21 +355,25 @@ def main():
 
     with tab1:
         st.subheader("Natural Language Query")
+        if "query_running" not in st.session_state:
+            st.session_state.query_running = False
+
         with st.form("query_form", clear_on_submit=False):
             question = st.text_input("Enter your question:", placeholder="e.g., What is the average salary for remote vs on-site AI jobs?")
             submitted = st.form_submit_button("Search", type="primary")
 
-        if submitted and not question:
-            st.warning("Please enter a question before searching.")
-
-        if submitted and question:
+        if submitted and st.session_state.query_running:
+            st.info("Query in progress, please wait...")
+        elif submitted:
+            query = question or "What is the average salary for remote vs on-site AI jobs?"
+            st.session_state.query_running = True
             status = st.status(f"Analyzing with {engine}...", expanded=True)
             try:
                 llm = get_llm(engine_key)
                 sql, columns, rows, error = None, [], [], None
                 for attempt in range(3):
                     error_hint = f"\nPrevious SQL failed: {error}\nGenerate a DIFFERENT valid SQL query." if error else ""
-                    sql = generate_sql_with_llm(llm, question, error_hint)
+                    sql = generate_sql_with_llm(llm, query, error_hint)
                     columns, rows, error = execute_sql(sql) if sql else ([], [], "Empty SQL generated")
                     if not error:
                         break
@@ -390,7 +394,7 @@ def main():
                         render_chart(chart_type, columns, rows, make_chart_title(sql, columns), sql)
                     if rows:
                         st.subheader("AI Summary")
-                        st.markdown(summarize_with_llm(llm, question, sql, columns, rows))
+                        st.markdown(summarize_with_llm(llm, query, sql, columns, rows))
             except Exception as e:
                 status.update(label="Error", state="error")
                 st.error(f"Error: {str(e)}")
@@ -398,6 +402,8 @@ def main():
                     st.info("Ensure the local LLM server is running (see AGENT.md)")
                 else:
                     st.info("Check your DeepSeek API key and network connection")
+            finally:
+                st.session_state.query_running = False
 
     with tab2:
         st.subheader("Data Browser")
