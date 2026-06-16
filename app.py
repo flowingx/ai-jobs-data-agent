@@ -320,39 +320,41 @@ def main():
             submitted = st.form_submit_button("Search", type="primary")
 
         if submitted and question:
-            with st.spinner(f"Analyzing with {engine}..."):
-                try:
-                    llm = get_llm(engine_key)
-                    sql, columns, rows, error = None, [], [], None
-                    for attempt in range(3):
-                        error_hint = f"\nPrevious SQL failed: {error}\nGenerate a DIFFERENT valid SQL query." if error else ""
-                        sql = generate_sql_with_llm(llm, question, error_hint)
-                        columns, rows, error = execute_sql(sql) if sql else ([], [], "Empty SQL generated")
-                        if not error:
-                            break
+            status = st.status(f"Analyzing with {engine}...", expanded=True)
+            try:
+                llm = get_llm(engine_key)
+                sql, columns, rows, error = None, [], [], None
+                for attempt in range(3):
+                    error_hint = f"\nPrevious SQL failed: {error}\nGenerate a DIFFERENT valid SQL query." if error else ""
+                    sql = generate_sql_with_llm(llm, question, error_hint)
+                    columns, rows, error = execute_sql(sql) if sql else ([], [], "Empty SQL generated")
+                    if not error:
+                        break
 
-                    if error:
-                        st.error(f"SQL Error: {error}")
-                        if sql:
-                            st.code(sql, language="sql")
-                    else:
-                        st.success("Query executed successfully")
+                if error:
+                    status.update(label="Query failed", state="error")
+                    st.error(f"SQL Error: {error}")
+                    if sql:
                         st.code(sql, language="sql")
-                        df = pd.DataFrame(rows, columns=columns)
-                        st.dataframe(df, use_container_width=True)
-                        chart_type = auto_detect_chart(sql, columns, rows)
-                        if chart_type and rows:
-                            st.subheader("Visualization")
-                            render_chart(chart_type, columns, rows, question)
-                        if rows:
-                            st.subheader("AI Summary")
-                            st.markdown(summarize_with_llm(llm, question, sql, columns, rows))
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
-                    if engine_key == "local":
-                        st.info("Ensure the local LLM server is running (see AGENT.md)")
-                    else:
-                        st.info("Check your DeepSeek API key and network connection")
+                else:
+                    status.update(label="Query complete", state="complete")
+                    st.code(sql, language="sql")
+                    df = pd.DataFrame(rows, columns=columns)
+                    st.dataframe(df, use_container_width=True)
+                    chart_type = auto_detect_chart(sql, columns, rows)
+                    if chart_type and rows:
+                        st.subheader("Visualization")
+                        render_chart(chart_type, columns, rows, question)
+                    if rows:
+                        st.subheader("AI Summary")
+                        st.markdown(summarize_with_llm(llm, question, sql, columns, rows))
+            except Exception as e:
+                status.update(label="Error", state="error")
+                st.error(f"Error: {str(e)}")
+                if engine_key == "local":
+                    st.info("Ensure the local LLM server is running (see AGENT.md)")
+                else:
+                    st.info("Check your DeepSeek API key and network connection")
 
     with tab2:
         st.subheader("Data Browser")
