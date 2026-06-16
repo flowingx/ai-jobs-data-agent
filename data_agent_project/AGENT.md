@@ -1,14 +1,49 @@
 # AGENT.md - Data Analysis Agent Configuration
 
-## LLM Server (User-Managed)
+## Dual-Engine Architecture
 
-**CRITICAL: The LLM server is managed by the user in a separate terminal. Do NOT start, stop, or test it.**
+The agent supports two LLM backends:
 
-The server runs at `http://127.0.0.1:8080/v1` and is always assumed to be alive.
+| Engine | Default | Max Tokens | Use Case |
+|--------|---------|------------|----------|
+| **DeepSeek (Cloud)** | ✅ Yes | 4096 | Stable, recommended for demos |
+| **Local GPU (llama.cpp)** | Optional | 1024 | Offline, data privacy |
 
-### Startup Command (WSL/Linux - GPU mode)
+## Setup
+
+### 1. Environment Configuration
 
 ```bash
+cd data_agent_project
+cp .env.example .env
+```
+
+Edit `.env` and fill in your DeepSeek API key:
+
+```env
+DEEPSEEK_API_KEY=sk-your-key-here
+```
+
+### 2. Initialize Database
+
+```bash
+python3 scripts/init_db.py
+```
+
+### 3. Start Web UI
+
+```bash
+streamlit run app.py
+```
+
+Open `http://localhost:8501`. Use the sidebar radio button to switch engines.
+
+## Local GPU Mode (Optional)
+
+If you want to use the local llama.cpp server instead of DeepSeek:
+
+```bash
+# Start the GPU server in a separate terminal:
 LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:/tmp/llama-cuda-build/build/bin \
   /tmp/llama-cuda-build/build/bin/llama-server \
   --model ~/models/Qwen3VL-4B-Instruct-Q4_K_M.gguf \
@@ -16,24 +51,14 @@ LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:/tmp/llama-cuda-build/build/bin \
   --host 127.0.0.1 --port 8080 --ctx-size 4096 -ngl 99
 ```
 
-## Configuration
+Then select "Local GPU (llama.cpp)" in the UI sidebar.
 
-| Setting | Value |
-|---------|-------|
-| LLM Endpoint | `http://127.0.0.1:8080/v1` |
-| Model | `Qwen3VL-4B-Instruct-Q4_K_M.gguf` |
-| API Key | `not-needed` (local server) |
-| Database | `db/ai_jobs.db` (SQLite) |
-
-## Running the Agent
+## CLI Usage
 
 ```bash
-# Initialize database
-python3 scripts/init_db.py
-
-# Run agent with a question
+# DeepSeek (default)
 python3 scripts/data_agent.py -q "What are the top 5 skills?"
 
-# Start web UI
-streamlit run app.py
+# Local GPU
+python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
 ```
