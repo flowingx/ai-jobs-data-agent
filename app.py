@@ -227,7 +227,19 @@ def auto_detect_chart(sql: str, columns: list, rows: list) -> str:
     return None
 
 
-def render_chart(chart_type: str, columns: list, rows: list, title: str):
+def make_chart_title(sql: str, columns: list) -> str:
+    sql_upper = sql.upper()
+    if len(columns) >= 2:
+        y_col = columns[1]
+        if "GROUP BY" in sql_upper:
+            return f"{y_col} by {columns[0]}"
+        if "ORDER BY" in sql_upper:
+            return f"{y_col} ranked by {columns[0]}"
+        return f"{y_col} vs {columns[0]}"
+    return columns[0] if columns else "Query Results"
+
+
+def render_chart(chart_type: str, columns: list, rows: list, title: str, sql: str = ""):
     if not rows or not columns:
         return
     plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "WenQuanYi Micro Hei", "DejaVu Sans"]
@@ -372,7 +384,7 @@ def main():
                     chart_type = auto_detect_chart(sql, columns, rows)
                     if chart_type and rows:
                         st.subheader("Visualization")
-                        render_chart(chart_type, columns, rows, question)
+                        render_chart(chart_type, columns, rows, make_chart_title(sql, columns), sql)
                     if rows:
                         st.subheader("AI Summary")
                         st.markdown(summarize_with_llm(llm, question, sql, columns, rows))
@@ -411,7 +423,7 @@ def main():
                                     st.dataframe(pd.DataFrame(rows, columns=columns), use_container_width=True)
                                     chart_type = auto_detect_chart(sql, columns, rows)
                                     if chart_type:
-                                        render_chart(chart_type, columns, rows, q)
+                                        render_chart(chart_type, columns, rows, make_chart_title(sql, columns), sql)
                                     st.markdown(f"**Answer:** {summarize_with_llm(llm, q, sql, columns, rows)}")
                                 else:
                                     st.error(f"Error: {error}" if error else "No results")
