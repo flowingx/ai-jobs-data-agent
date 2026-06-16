@@ -36,6 +36,7 @@ SQL_RULES = """RULES:
 - Use WITH CTE for dynamic categorization/grouping.
 - Use LOWER(col) LIKE LOWER('%keyword%') for text search.
 - JOIN job_skills js ON jp.job_id = js.job_id for skill analysis.
+- Use English aliases for columns (AS "English Label") so chart labels are readable.
 - Output ONLY the SQL query."""
 
 

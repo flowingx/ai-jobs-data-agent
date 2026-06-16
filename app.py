@@ -38,6 +38,7 @@ SQL_RULES = """RULES:
 - Use WITH CTE for dynamic categorization/grouping.
 - Use LOWER(col) LIKE LOWER('%keyword%') for text search.
 - JOIN job_skills js ON jp.job_id = js.job_id for skill analysis.
+- Use English aliases for columns (AS "English Label") so chart labels are readable.
 - Output ONLY the SQL query."""
 
 SAMPLE_QUESTIONS = {
@@ -157,12 +158,44 @@ def summarize_with_llm(llm, question: str, sql: str, columns: list, rows: list) 
 
 def auto_detect_chart(sql: str, columns: list, rows: list) -> str:
     sql_upper = sql.upper()
+
+    # Time series: year/month columns with aggregate → line
+    if any(kw in sql_upper for kw in ["YEAR", "MONTH", "POSTING_YEAR", "POSTING_MONTH"]):
+        if any(fn in sql_upper for fn in ["AVG", "SUM", "COUNT", "MIN", "MAX"]):
+            return "line"
+
+    # Two numeric columns → scatter
+    if len(columns) >= 2:
+        numeric_count = 0
+        for row in rows[:20]:
+            if row and len(row) >= 2:
+                try:
+                    float(row[0])
+                    float(row[1])
+                    numeric_count += 1
+                except (ValueError, TypeError):
+                    pass
+        if numeric_count >= len(rows[:20]) * 0.8 and len(rows) >= 5:
+            return "scatter"
+
+    # GROUP BY with COUNT and few categories → pie
     if "GROUP BY" in sql_upper and "COUNT" in sql_upper:
-        return "pie" if len(rows) <= 8 else "bar"
+        if len(rows) <= 8:
+            return "pie"
+        return "bar"
+
+    # Aggregate functions → bar
     if any(fn in sql_upper for fn in ["AVG", "SUM", "MIN", "MAX"]):
         return "bar"
+
+    # ORDER BY with limited rows → bar
     if "ORDER BY" in sql_upper and len(rows) <= 20:
         return "bar"
+
+    # Default: if 2+ columns with text + numeric, use bar
+    if len(columns) >= 2 and len(rows) <= 30:
+        return "bar"
+
     return None
 
 
@@ -171,24 +204,28 @@ def render_chart(chart_type: str, columns: list, rows: list, title: str):
         return
     plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "WenQuanYi Micro Hei", "DejaVu Sans"]
     plt.rcParams["axes.unicode_minus"] = False
+    plt.rcParams["axes.unicode_color"] = "#333333"
     df = pd.DataFrame(rows, columns=columns)
 
+    fig = None
+
     if chart_type == "bar" and len(columns) >= 2:
-        fig, ax = plt.subplots(figsize=(10, 5))
+        fig, ax = plt.subplots(figsize=(10, max(4, len(rows) * 0.4)))
         x_col, y_col = columns[0], columns[1]
         try:
             df[y_col] = pd.to_numeric(df[y_col])
         except (ValueError, TypeError):
             pass
-        d = df.head(20).copy()
+        d = df.head(25).copy()
         d[x_col] = d[x_col].astype(str).str[:30]
-        ax.barh(d[x_col], d[y_col])
-        ax.set_xlabel(y_col)
-        ax.set_title(title)
+        colors = plt.cm.viridis([i / len(d) for i in range(len(d))])
+        ax.barh(d[x_col], d[y_col], color=colors)
+        ax.set_xlabel(y_col, fontsize=10)
+        ax.set_title(title, fontsize=12, fontweight="bold")
         ax.invert_yaxis()
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close(fig)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
     elif chart_type == "pie" and len(columns) >= 2:
         fig, ax = plt.subplots(figsize=(8, 8))
         x_col, y_col = columns[0], columns[1]
@@ -197,8 +234,52 @@ def render_chart(chart_type: str, columns: list, rows: list, title: str):
         except (ValueError, TypeError):
             pass
         d = df.head(10).copy()
-        ax.pie(d[y_col], labels=d[x_col], autopct="%1.1f%%", startangle=90)
-        ax.set_title(title)
+        colors = plt.cm.Set3([i / len(d) for i in range(len(d))])
+        wedges, texts, autotexts = ax.pie(
+            d[y_col], labels=d[x_col], autopct="%1.1f%%",
+            startangle=90, colors=colors, pctdistance=0.85
+        )
+        for text in texts:
+            text.set_fontsize(9)
+        for autotext in autotexts:
+            autotext.set_fontsize(8)
+        ax.set_title(title, fontsize=12, fontweight="bold", pad=20)
+
+    elif chart_type == "line" and len(columns) >= 2:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        x_col, y_col = columns[0], columns[1]
+        try:
+            df[y_col] = pd.to_numeric(df[y_col])
+        except (ValueError, TypeError):
+            pass
+        d = df.head(30).copy()
+        d[x_col] = d[x_col].astype(str).str[:20]
+        ax.plot(d[x_col], d[y_col], marker="o", linewidth=2, markersize=6, color="#4C78A8")
+        ax.fill_between(range(len(d)), d[y_col], alpha=0.1, color="#4C78A8")
+        ax.set_xlabel(x_col, fontsize=10)
+        ax.set_ylabel(y_col, fontsize=10)
+        ax.set_title(title, fontsize=12, fontweight="bold")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        plt.xticks(rotation=45, ha="right")
+
+    elif chart_type == "scatter" and len(columns) >= 2:
+        fig, ax = plt.subplots(figsize=(8, 6))
+        x_col, y_col = columns[0], columns[1]
+        try:
+            df[x_col] = pd.to_numeric(df[x_col])
+            df[y_col] = pd.to_numeric(df[y_col])
+        except (ValueError, TypeError):
+            pass
+        d = df.head(50).copy()
+        ax.scatter(d[x_col], d[y_col], alpha=0.6, s=50, c="#4C78A8", edgecolors="white", linewidth=0.5)
+        ax.set_xlabel(x_col, fontsize=10)
+        ax.set_ylabel(y_col, fontsize=10)
+        ax.set_title(title, fontsize=12, fontweight="bold")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+    if fig:
         plt.tight_layout()
         st.pyplot(fig)
         plt.close(fig)
