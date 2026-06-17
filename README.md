@@ -83,7 +83,7 @@ python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
 ```
 ├── .env.example          # 环境配置模板
 ├── .gitignore
-├── AGENT.md              # 技术开发文档
+├── AGENTS.md             # AI Agent 工作指南
 ├── LICENSE               # Apache 2.0
 ├── README.md             # 本文件
 ├── requirements.txt      # Python 依赖
@@ -92,11 +92,14 @@ python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
 │   ├── ai_jobs_market_2025_2026.csv
 │   └── charts/
 ├── db/
-│   ├── ai_jobs.db        # SQLite 数据库（可重新生成）
-│   └── careers.db
-└── scripts/
-    ├── data_agent.py     # SQL Agent（带重试）
-    └── init_db.py        # 数据导入
+│   └── ai_jobs.db        # SQLite 数据库（可重新生成）
+├── scripts/
+│   ├── __init__.py
+│   ├── llm_utils.py      # 共享 LLM/SQL 工具函数
+│   ├── data_agent.py     # CLI Agent（带重试）
+│   └── init_db.py        # 数据导入
+└── tests/
+    └── test_llm_utils.py # 单元测试（21 项）
 ```
 
 ## 数据库结构
