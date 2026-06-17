@@ -25,7 +25,6 @@ SQL_RULES = """CRITICAL RULES:
 - Max 15 lines of SQL. Use simple WHERE, never 100+ OR chains.
 - Always use LOWER() for case-insensitive search: LOWER(col) LIKE LOWER('%keyword%').
 - Skill search: LOWER(js.skill) LIKE LOWER('%python%') or LOWER(required_skills) LIKE LOWER('%python%').
-- Job category filter: ONLY add WHERE clause with LOWER(job_category) LIKE LOWER('%ai%') when the user explicitly asks to filter by AI-related categories. For queries asking about ALL categories or comparing categories, use GROUP BY without any WHERE filter on job_category.
 - Use English column aliases (AS "Label") for chart readability.
 - CRITICAL: When user asks about trends, popularity, or technology comparisons (e.g., 'Is X still popular?', 'Compare X and Y'), the generated SQL MUST use GROUP BY to break down the metrics by temporal or categorical dimensions (such as posting_year, experience_level, or specific technology keywords using CASE WHEN or LIKE). NEVER return a single aggregated value or single row for comparison queries."""
 
