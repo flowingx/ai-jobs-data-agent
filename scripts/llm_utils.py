@@ -107,10 +107,12 @@ def summarize_with_llm(llm, question: str, sql: str, columns: list, rows: list) 
     rows_sample = rows[:15]
     import json
     messages = [
-        SystemMessage(content="Summarize the SQL results in 1-2 sentences. Be concise."),
+        SystemMessage(content="Summarize the SQL results in 1-2 sentences. Be concise. CRITICAL: Do not use any backticks (`) or inline code syntax for numbers or financial figures. Return numbers as plain text (e.g., 212782 or 212,782) without any Markdown highlighting."),
         HumanMessage(content=f"Question: {question}\nSQL: {sql}\nColumns: {columns}\nResults: {json.dumps(rows_sample, default=str, ensure_ascii=False)}")
     ]
     response = llm.invoke(messages)
     log_usage("Summary", response)
     raw = response.content if hasattr(response, "content") else str(response)
-    return clean_llm_output(raw)
+    summary_text = clean_llm_output(raw)
+    summary_text = summary_text.replace("`", "")
+    return summary_text
