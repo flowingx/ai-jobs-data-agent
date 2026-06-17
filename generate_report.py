@@ -163,32 +163,29 @@ add_table(
     ],
 )
 
-doc.add_heading("2.3 智能建库与幂等性保障", level=2)
+doc.add_heading("2.3 智能建库、防重复 I/O 与自适应幂等性保障", level=2)
 add_body(
-    "建库脚本 init_db.py 采用幂等性设计：每次执行前先检查目标数据库文件是否存在。若 db/ai_jobs.db "
-    "已存在，脚本会自动删除旧库并重建，确保数据一致性。这一设计使得脚本可在 Docker 容器重启、"
-    "CI/CD 流水线等场景中安全重复执行，无需人工干预。"
-)
-add_body("脚本核心流程：")
-add_code_block(
-    "def build_database():\n"
-    "    # 1. 检查 CSV 文件是否存在\n"
-    "    if not CSV_PATH.exists(): return\n"
-    "    # 2. 读取并清洗数据\n"
-    "    df = clean_dataframe(pd.read_csv(CSV_PATH))\n"
-    "    # 3. 删除旧数据库，重建\n"
-    "    if DB_PATH.exists(): DB_PATH.unlink()\n"
-    "    # 4. 建表、导入、填充维度表\n"
-    "    create_tables(conn)\n"
-    "    df.to_sql('job_postings', conn, if_exists='append')\n"
-    "    populate_dimension_tables(conn, df)\n"
-    "    populate_skills(conn, df)"
+    '系统对关系数据库的初始化脚本 scripts/init_db.py 进行了全方位的工业级硬化设计，'
+    '抛弃了传统"盲目删库重建"的高能耗、高风险方案，实现了基于状态检测的自适应增量幂等性底座。'
 )
 
-doc.add_heading("2.4 预处理结果", level=2)
+add_body("（1）原子化状态校验：")
 add_body(
-    "经清洗后保留 1,500 条有效记录，所有字段缺失值已处理完毕。清洗后的数据直接通过 pandas 的 to_sql() "
-    "方法写入 SQLite 数据库，无需再生成中间 CSV 文件。"
+    '脚本在执行时，首先通过标准 I/O 检查 db/ai_jobs.db 物理文件是否存在。若文件存在，'
+    '系统将深入校验 job_postings 核心表的数据行数，确认数据完整性。'
+)
+
+add_body("（2）防重复写盘与自愈保护：")
+add_body(
+    '当检测到数据库已初始化且数据完备时，系统会自动终止后续的高密集型 CSV 解析与写盘操作，'
+    '输出提示："Database already initialized with data. Skipping full recreation." 并安全退出。'
+    '这在频繁重启开发环境或多用户并发部署时，彻底杜绝了重复 I/O 导致的磁盘磨损与数据二次污染。'
+)
+
+add_body("（3）带后门的安全覆写机制（--force）：")
+add_body(
+    '为了同时满足"生产环境防误删"与"开发环境重洗数据"的双重需求，脚本引入了命令行参数解析器。'
+    '只有当显式传入 --force 标志时，系统才会执行全量擦除重建，完美兼顾了自动化部署的安全性与调试的灵活性。'
 )
 doc.add_page_break()
 
@@ -771,6 +768,38 @@ add_body(
     "experience_levels.level <-- 基于 job_postings.experience_level 聚合\n"
     "location_summary <-- 基于 job_postings.country + city 聚合"
 )
+
+# ============================================================
+# 双字体强制规范：中文宋体 + 英文/数字 Times New Roman
+# ============================================================
+import re
+
+def enforce_dual_font(doc):
+    """遍历整个文档，强制所有 run 使用宋体（中文）+ Times New Roman（英文/数字）。"""
+    for paragraph in doc.paragraphs:
+        for run in paragraph.runs:
+            run.font.name = "Times New Roman"
+            run._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.name = "Times New Roman"
+                        run._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
+
+    for section in doc.sections:
+        for paragraph in section.header.paragraphs:
+            for run in paragraph.runs:
+                run.font.name = "Times New Roman"
+                run._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
+        for paragraph in section.footer.paragraphs:
+            for run in paragraph.runs:
+                run.font.name = "Times New Roman"
+                run._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
+
+enforce_dual_font(doc)
 
 # ============================================================
 # 保存
