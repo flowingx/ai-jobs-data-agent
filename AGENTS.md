@@ -45,13 +45,12 @@ SQLite at `db/ai_jobs.db`. Tables:
 
 ## Key gotchas
 
-- **No tests, no lint, no typecheck** — this repo has zero CI or validation tooling
+- **No lint, no typecheck** — this repo has zero CI or validation tooling
 - **No OpenAI key needed** — it uses DeepSeek API via `langchain-openai` (compatible OpenAI SDK). The env var `DEEPSEEK_API_KEY` is what matters, not `OPENAI_API_KEY`
-- **LLM output parsing** — `extract_sql()` in both files strips markdown fences, comments, and truncates long OR chains. Any SQL modification should preserve these anti-hallucination guards
+- **LLM output parsing** — `extract_sql()` strips markdown fences, comments, and truncates long OR chains. Any SQL modification should preserve these anti-hallucination guards
 - **`init_db.py` is destructive** — it deletes and rebuilds `ai_jobs.db` from scratch
 - **Local GPU mode** requires a separate llama-server process (see README for exact command)
-- **`careers.db`** in `db/` appears unused by app.py or data_agent.py
-- **Two duplicate codebases** — `app.py` and `scripts/data_agent.py` share nearly identical LLM/SQL logic. Changes to SQL rules or LLM config must be applied to both files
+- **Shared code** — `scripts/llm_utils.py` is the single source of truth for LLM/SQL logic. Changes to SQL rules or LLM config go there only
 
 ## Code conventions
 
@@ -60,8 +59,8 @@ SQLite at `db/ai_jobs.db`. Tables:
 - LangChain `ChatOpenAI` with `temperature=0`, `max_tokens=1024`
 - Charts via matplotlib (Agg backend), rendered through Streamlit
 - All SQL is SELECT-only, enforced both in prompt and at runtime (OR chain truncation, length limit)
+- Unit tests: `python3 -m unittest discover tests/ -v`
 
 ## Existing docs
 
-- `AGENT.md` — detailed technical reference (architecture, SQL rules, chart types, env vars)
 - `README.md` — user-facing setup and usage guide

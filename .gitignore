@@ -4,6 +4,9 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 
+# Environment
+.env
+
 # Generated outputs
 reports/
 outputs/
