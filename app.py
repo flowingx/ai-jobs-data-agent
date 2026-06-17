@@ -118,8 +118,26 @@ def get_table_dataframe(table_name: str, limit: int = 100) -> pd.DataFrame:
         return pd.read_sql_query(f"SELECT * FROM [{table_name}] LIMIT {limit}", conn)
 
 
+def render_metric_card(rows: list, columns: list):
+    if len(rows) != 1 or len(columns) < 2:
+        return
+    row = rows[0]
+    for i in range(1, len(columns)):
+        label = columns[i]
+        value = row[i]
+        if isinstance(value, float):
+            value = f"{value:,.2f}"
+        elif isinstance(value, int):
+            value = f"{value:,}"
+        st.metric(label=label, value=value)
+
+
 def auto_detect_chart(sql: str, columns: list, rows: list) -> str:
     sql_upper = sql.upper()
+
+    # Single row or no data → metric card, not chart
+    if len(rows) <= 1:
+        return None
 
     # Time series: year/month columns with aggregate → line
     if any(kw in sql_upper for kw in ["YEAR", "MONTH", "POSTING_YEAR", "POSTING_MONTH"]):
@@ -220,17 +238,24 @@ def render_chart(chart_type: str, columns: list, rows: list, title: str, sql: st
 
     elif chart_type == "line" and len(columns) >= 2:
         fig, ax = plt.subplots(figsize=(10, 5))
-        x_col, y_col = columns[0], columns[1]
-        try:
-            df[y_col] = pd.to_numeric(df[y_col])
-        except (ValueError, TypeError):
-            pass
+        x_col = columns[0]
         d = df.head(30).copy()
         d[x_col] = d[x_col].astype(str).str[:20]
-        ax.plot(d[x_col], d[y_col], marker="o", linewidth=2, markersize=6, color="#4C78A8")
-        ax.fill_between(range(len(d)), d[y_col], alpha=0.1, color="#4C78A8")
+        colors = ["#4C78A8", "#E45756", "#72B7B2", "#F58518", "#54A24B"]
+        numeric_cols = []
+        for c in columns[1:]:
+            try:
+                d[c] = pd.to_numeric(d[c])
+                numeric_cols.append(c)
+            except (ValueError, TypeError):
+                pass
+        for i, y_col in enumerate(numeric_cols):
+            color = colors[i % len(colors)]
+            ax.plot(d[x_col], d[y_col], marker="o", linewidth=2, markersize=6, color=color, label=y_col)
+        if len(numeric_cols) > 1:
+            ax.legend(fontsize=9)
         ax.set_xlabel(x_col, fontsize=10)
-        ax.set_ylabel(y_col, fontsize=10)
+        ax.set_ylabel(numeric_cols[0] if numeric_cols else "", fontsize=10)
         ax.set_title(title, fontsize=12, fontweight="bold")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
@@ -336,6 +361,8 @@ def main():
                     if chart_type and rows:
                         st.subheader("Visualization")
                         render_chart(chart_type, columns, rows, make_chart_title(sql, columns), sql)
+                    elif len(rows) == 1:
+                        render_metric_card(rows, columns)
                     if rows:
                         st.subheader("AI Summary")
                         st.markdown(summarize_with_llm(llm, question, sql, columns, rows))
@@ -408,6 +435,8 @@ def main():
                                     chart_type = auto_detect_chart(sql, columns, rows)
                                     if chart_type:
                                         render_chart(chart_type, columns, rows, make_chart_title(sql, columns), sql)
+                                    elif len(rows) == 1:
+                                        render_metric_card(rows, columns)
                                     st.markdown(f"**Answer:** {summarize_with_llm(llm, q, sql, columns, rows)}")
                                 else:
                                     st.error(f"Error: {error}" if error else "No results")

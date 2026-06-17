@@ -26,7 +26,8 @@ SQL_RULES = """CRITICAL RULES:
 - Always use LOWER() for case-insensitive search: LOWER(col) LIKE LOWER('%keyword%').
 - Skill search: LOWER(js.skill) LIKE LOWER('%python%') or LOWER(required_skills) LIKE LOWER('%python%').
 - Job category: LOWER(job_category) LIKE LOWER('%ai%').
-- Use English column aliases (AS "Label") for chart readability."""
+- Use English column aliases (AS "Label") for chart readability.
+- CRITICAL: When user asks about trends, popularity, or technology comparisons (e.g., 'Is X still popular?', 'Compare X and Y'), the generated SQL MUST use GROUP BY to break down the metrics by temporal or categorical dimensions (such as posting_year, experience_level, or specific technology keywords using CASE WHEN or LIKE). NEVER return a single aggregated value or single row for comparison queries."""
 
 MAX_SQL_LENGTH = 1500
 MAX_OR_CHAINS = 10
