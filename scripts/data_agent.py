@@ -3,7 +3,6 @@
 
 import json
 import os
-import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -12,52 +11,17 @@ from typing import Optional
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage
+from scripts.llm_utils import (
+    clean_llm_output,
+    extract_sql,
+    get_llm,
+    generate_sql_with_llm,
+    summarize_with_llm,
+)
 
 DB_PATH = Path(__file__).parent.parent / "db" / "ai_jobs.db"
 
 MAX_RETRIES = 3
-
-SCHEMA_HINT = """Tables and columns:
-
-job_postings: job_id, job_title, job_category, experience_level, years_of_experience, education_required, annual_salary_usd, salary_min_usd, salary_max_usd, city, country, remote_work, company_size, industry, required_skills, ai_salary_premium_pct, demand_score, demand_growth_yoy_pct, benefits_score_10, posting_year, posting_month, is_senior, is_remote_friendly, is_llm_role, salary_tier
-
-job_skills: id, job_id, skill
-
-job_categories: category, job_count, avg_salary, avg_demand_score
-
-experience_levels: level, job_count, avg_salary, avg_years_experience
-
-location_summary: country, city, job_count, avg_salary"""
-
-SQL_RULES = """CRITICAL RULES:
-- Output ONLY the SQL query. No explanations, no comments, no markdown.
-- SELECT only. No CREATE/DROP/ALTER/INSERT/UPDATE/DELETE.
-- Max 15 lines of SQL. Use simple WHERE, never 100+ OR chains.
-- Always use LOWER() for case-insensitive search: LOWER(col) LIKE LOWER('%keyword%').
-- Skill search: LOWER(js.skill) LIKE LOWER('%python%') or LOWER(required_skills) LIKE LOWER('%python%').
-- Job category: LOWER(job_category) LIKE LOWER('%ai%').
-- Use English column aliases (AS "Label") for chart readability."""
-
-
-def get_llm(engine: str = "deepseek"):
-    if engine == "deepseek":
-        return ChatOpenAI(
-            model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
-            base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-            api_key=os.getenv("DEEPSEEK_API_KEY", ""),
-            temperature=0,
-            max_tokens=1024,
-        )
-    else:
-        return ChatOpenAI(
-            model=os.getenv("LOCAL_MODEL", "local-model"),
-            base_url=os.getenv("LOCAL_LLM_URL", "http://127.0.0.1:8080/v1"),
-            api_key="not-needed",
-            temperature=0,
-            max_tokens=1024,
-        )
 
 
 def execute_sql(sql: str) -> tuple[list, list, Optional[str]]:
@@ -71,80 +35,6 @@ def execute_sql(sql: str) -> tuple[list, list, Optional[str]]:
         return [], [], str(e)
     finally:
         conn.close()
-
-
-MAX_SQL_LENGTH = 1500
-MAX_OR_CHAINS = 10
-
-
-def clean_llm_output(text: str) -> str:
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    text = re.sub(r'<think>.*', '', text, flags=re.DOTALL)
-    text = re.sub(r'.*</think>', '', text, flags=re.DOTALL)
-    return text.strip()
-
-
-def extract_sql(text: str) -> str:
-    text = clean_llm_output(text)
-    # Try to extract from markdown code block
-    m = re.search(r'```(?:sql)?\s*\n?(.*?)```', text, re.DOTALL)
-    if m:
-        text = m.group(1)
-    else:
-        # No closing fence — take from first SQL keyword to end
-        m2 = re.search(r'(WITH\s|SELECT\s)', text, re.IGNORECASE)
-        if m2:
-            text = text[m2.start():]
-    # Strip comments
-    text = re.sub(r'--[^\n]*', '', text)
-    text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
-    # Count OR chains — if too many, the LLM is hallucinating
-    or_count = len(re.findall(r'\bOR\b', text, re.IGNORECASE))
-    if or_count > MAX_OR_CHAINS:
-        # Truncate at the Nth OR and close the WHERE clause
-        parts = re.split(r'\bOR\b', text, flags=re.IGNORECASE)
-        if len(parts) > MAX_OR_CHAINS:
-            text = " OR ".join(parts[:MAX_OR_CHAINS])
-            # Try to close the WHERE clause
-            if "WHERE" in text.upper():
-                text += "\n    LIMIT 50"
-    # Truncate if too long
-    if len(text) > MAX_SQL_LENGTH:
-        text = text[:MAX_SQL_LENGTH]
-    return text.strip().rstrip(";")
-
-
-def log_usage(tag: str, response):
-    usage = getattr(response, "usage_metadata", None)
-    if usage:
-        inp = usage.get("input_tokens", 0) or 0
-        out = usage.get("output_tokens", 0) or 0
-        total = usage.get("total_tokens", 0) or (inp + out)
-        print(f"  [{tag}] tokens: in={inp} out={out} total={total}")
-
-
-def generate_sql_with_llm(llm, question: str, error_hint: str = "") -> str:
-    error_section = f"\nPrevious SQL failed: {error_hint}\nGenerate a DIFFERENT valid SQL query." if error_hint else ""
-    messages = [
-        SystemMessage(content=f"You are a SQLite expert.\n\n{SCHEMA_HINT}\n\n{SQL_RULES}\n{error_section}"),
-        HumanMessage(content=f"Question: {question}")
-    ]
-    response = llm.invoke(messages)
-    log_usage("SQL", response)
-    raw = response.content if hasattr(response, "content") else str(response)
-    return extract_sql(raw)
-
-
-def summarize_with_llm(llm, question: str, sql: str, columns: list, rows: list) -> str:
-    rows_sample = rows[:15]
-    messages = [
-        SystemMessage(content="Summarize the SQL results in 1-2 sentences. Be concise."),
-        HumanMessage(content=f"Question: {question}\nSQL: {sql}\nColumns: {columns}\nResults: {json.dumps(rows_sample, default=str, ensure_ascii=False)}")
-    ]
-    response = llm.invoke(messages)
-    log_usage("Summary", response)
-    raw = response.content if hasattr(response, "content") else str(response)
-    return clean_llm_output(raw)
 
 
 def query_agent(question: str, engine: str = "deepseek", verbose: bool = True) -> dict:
