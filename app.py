@@ -237,7 +237,6 @@ def render_chart(chart_type: str, columns: list, rows: list, title: str, sql: st
         ax.set_title(title, fontsize=12, fontweight="bold", pad=20)
 
     elif chart_type == "line" and len(columns) >= 2:
-        fig, ax = plt.subplots(figsize=(10, 5))
         x_col = columns[0]
         d = df.head(30).copy()
         d[x_col] = d[x_col].astype(str).str[:20]
@@ -249,17 +248,106 @@ def render_chart(chart_type: str, columns: list, rows: list, title: str, sql: st
                 numeric_cols.append(c)
             except (ValueError, TypeError):
                 pass
-        for i, y_col in enumerate(numeric_cols):
-            color = colors[i % len(colors)]
-            ax.plot(d[x_col], d[y_col], marker="o", linewidth=2, markersize=6, color=color, label=y_col)
-        if len(numeric_cols) > 1:
-            ax.legend(fontsize=9)
-        ax.set_xlabel(x_col, fontsize=10)
-        ax.set_ylabel(numeric_cols[0] if numeric_cols else "", fontsize=10)
-        ax.set_title(title, fontsize=12, fontweight="bold")
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        plt.xticks(rotation=45, ha="right")
+
+        if len(numeric_cols) < 1:
+            pass
+        else:
+            col_ranges = {}
+            for c in numeric_cols:
+                col_ranges[c] = d[c].max() - d[c].min() if len(d) > 1 else d[c].max()
+
+            max_range = max(col_ranges.values()) if col_ranges else 1
+            has_mixed = any(v < max_range * 0.05 for v in col_ranges.values()) and len(numeric_cols) > 1
+
+            is_temporal = any(kw in sql.upper() for kw in ["YEAR", "MONTH", "POSTING_YEAR", "POSTING_MONTH"])
+
+            if has_mixed and len(numeric_cols) >= 2:
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+                salary_keywords = ["salary", "compensation", "pay", "wage", "income", "earn"]
+                salary_cols = [c for c in numeric_cols if any(k in c.lower() for k in salary_keywords)]
+                count_cols = [c for c in numeric_cols if c not in salary_cols]
+
+                if not salary_cols:
+                    sorted_by_range = sorted(numeric_cols, key=lambda c: col_ranges[c], reverse=True)
+                    salary_cols = [sorted_by_range[0]]
+                    count_cols = [c for c in numeric_cols if c not in salary_cols]
+
+                demand_keywords = ["count", "job", "demand", "opening", "posting", "number"]
+                demand_cols = [c for c in count_cols if any(k in c.lower() for k in demand_keywords)] or count_cols
+                other_cols = [c for c in count_cols if c not in demand_cols]
+
+                for i, c in enumerate(demand_cols + other_cols):
+                    color = colors[i % len(colors)]
+                    ax1.plot(d[x_col], d[c], marker="o", linewidth=2, markersize=6, color=color, label=c)
+                ax1.set_title("Demand / Volume", fontsize=11, fontweight="bold")
+                ax1.set_xlabel(x_col, fontsize=9)
+                ax1.legend(fontsize=8)
+                ax1.spines["top"].set_visible(False)
+                ax1.spines["right"].set_visible(False)
+                ax1.tick_params(axis="x", rotation=45)
+
+                for i, c in enumerate(salary_cols):
+                    color = colors[(len(demand_cols) + other_cols + i) % len(colors)]
+                    ax2.plot(d[x_col], d[c], marker="o", linewidth=2, markersize=6, color=color, label=c)
+                ax2.set_title("Salary / Compensation", fontsize=11, fontweight="bold")
+                ax2.set_xlabel(x_col, fontsize=9)
+                ax2.legend(fontsize=8)
+                ax2.spines["top"].set_visible(False)
+                ax2.spines["right"].set_visible(False)
+                ax2.tick_params(axis="x", rotation=45)
+
+                fig.suptitle(title, fontsize=12, fontweight="bold", y=1.02)
+
+            elif is_temporal and len(numeric_cols) == 1:
+                fig, ax = plt.subplots(figsize=(10, 5))
+                y_col = numeric_cols[0]
+                ax.plot(d[x_col], d[y_col], marker="o", linewidth=2, markersize=6, color=colors[0])
+                ax.fill_between(range(len(d)), d[y_col], alpha=0.1, color=colors[0])
+                ax.set_xlabel(x_col, fontsize=10)
+                ax.set_ylabel(y_col, fontsize=10)
+                ax.set_title(title, fontsize=12, fontweight="bold")
+                ax.spines["top"].set_visible(False)
+                ax.spines["right"].set_visible(False)
+                plt.xticks(rotation=45, ha="right")
+
+            elif not is_temporal and len(numeric_cols) >= 1 and len(d) <= 15:
+                fig, ax = plt.subplots(figsize=(10, max(4, len(d) * 0.5)))
+                n_groups = len(d)
+                n_metrics = len(numeric_cols)
+                bar_width = 0.8 / max(n_metrics, 1)
+                x_pos = range(n_groups)
+
+                for i, y_col in enumerate(numeric_cols):
+                    offset = (i - n_metrics / 2 + 0.5) * bar_width
+                    bars = ax.barh(
+                        [p + offset for p in x_pos],
+                        d[y_col],
+                        height=bar_width,
+                        color=colors[i % len(colors)],
+                        label=y_col,
+                    )
+
+                ax.set_yticks(list(x_pos))
+                ax.set_yticklabels(d[x_col].astype(str).str[:25])
+                ax.set_title(title, fontsize=12, fontweight="bold")
+                ax.legend(fontsize=9)
+                ax.invert_yaxis()
+                ax.spines["top"].set_visible(False)
+                ax.spines["right"].set_visible(False)
+
+            else:
+                fig, ax = plt.subplots(figsize=(10, 5))
+                for i, y_col in enumerate(numeric_cols):
+                    color = colors[i % len(colors)]
+                    ax.plot(d[x_col], d[y_col], marker="o", linewidth=2, markersize=6, color=color, label=y_col)
+                if len(numeric_cols) > 1:
+                    ax.legend(fontsize=9)
+                ax.set_xlabel(x_col, fontsize=10)
+                ax.set_ylabel(numeric_cols[0] if numeric_cols else "", fontsize=10)
+                ax.set_title(title, fontsize=12, fontweight="bold")
+                ax.spines["top"].set_visible(False)
+                ax.spines["right"].set_visible(False)
+                plt.xticks(rotation=45, ha="right")
 
     elif chart_type == "scatter" and len(columns) >= 2:
         fig, ax = plt.subplots(figsize=(8, 6))
