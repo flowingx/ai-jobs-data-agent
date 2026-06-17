@@ -135,44 +135,29 @@ def render_metric_card(rows: list, columns: list):
 def auto_detect_chart(sql: str, columns: list, rows: list) -> str:
     sql_upper = sql.upper()
 
-    # Single row or no data → metric card, not chart
     if len(rows) <= 1:
         return None
 
-    # Time series: year/month columns with aggregate → line
-    if any(kw in sql_upper for kw in ["YEAR", "MONTH", "POSTING_YEAR", "POSTING_MONTH"]):
-        if any(fn in sql_upper for fn in ["AVG", "SUM", "COUNT", "MIN", "MAX"]):
-            return "line"
+    has_temporal = any(kw in sql_upper for kw in ["YEAR", "MONTH", "POSTING_YEAR", "POSTING_MONTH"])
 
-    # Two numeric columns → scatter
-    if len(columns) >= 2:
-        numeric_count = 0
-        for row in rows[:20]:
-            if row and len(row) >= 2:
-                try:
-                    float(row[0])
-                    float(row[1])
-                    numeric_count += 1
-                except (ValueError, TypeError):
-                    pass
-        if numeric_count >= len(rows[:20]) * 0.8 and len(rows) >= 5:
-            return "scatter"
+    if has_temporal:
+        salary_kw = ["SALARY", "COMPENSATION", "PAY", "WAGE", "INCOME", "EARN"]
+        count_kw = ["COUNT", "JOB", "DEMAND", "OPENING", "NUMBER"]
+        has_salary = any(k in sql_upper for k in salary_kw)
+        has_count = any(k in sql_upper for k in count_kw)
+        if has_salary and has_count:
+            return "dual_axis"
+        return "trend"
 
-    # GROUP BY with COUNT and few categories → pie
     if "GROUP BY" in sql_upper and "COUNT" in sql_upper:
-        if len(rows) <= 8:
-            return "pie"
-        return "bar"
+        return "pie" if len(rows) <= 8 else "bar"
 
-    # Aggregate functions → bar
     if any(fn in sql_upper for fn in ["AVG", "SUM", "MIN", "MAX"]):
         return "bar"
 
-    # ORDER BY with limited rows → bar
     if "ORDER BY" in sql_upper and len(rows) <= 20:
         return "bar"
 
-    # Default: if 2+ columns with text + numeric, use bar
     if len(columns) >= 2 and len(rows) <= 30:
         return "bar"
 
@@ -191,182 +176,158 @@ def make_chart_title(sql: str, columns: list) -> str:
     return columns[0] if columns else "Query Results"
 
 
+def _setup_font():
+    plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "WenQuanYi Micro Hei", "DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+
+
+def _find_col(columns: list, keywords: list[str]) -> str | None:
+    for c in columns:
+        if any(k in c.lower() for k in keywords):
+            return c
+    return None
+
+
+def draw_dual_axis_trend(df: pd.DataFrame, columns: list, title: str):
+    x_col = columns[0]
+    d = df.sort_values(x_col).copy()
+    d[x_col] = d[x_col].astype(str)
+
+    count_col = _find_col(columns[1:], ["count", "job", "demand", "opening", "number"])
+    salary_col = _find_col(columns[1:], ["salary", "compensation", "pay", "wage", "income"])
+
+    if not count_col:
+        numeric_cols = [c for c in columns[1:] if pd.api.types.is_numeric_dtype(df[c])]
+        count_col = numeric_cols[0] if numeric_cols else columns[1]
+    if not salary_col:
+        numeric_cols = [c for c in columns[1:] if pd.api.types.is_numeric_dtype(df[c])]
+        salary_col = [c for c in numeric_cols if c != count_col][0] if len(numeric_cols) > 1 else None
+
+    count_vals = pd.to_numeric(d[count_col], errors="coerce").fillna(0).values.astype(float)
+
+    fig, ax1 = plt.subplots(figsize=(10, 5))
+    x_pos = range(len(d))
+    ax1.bar(x_pos, count_vals, color="skyblue", alpha=0.6, label=count_col)
+    ax1.set_xlabel(columns[0], fontsize=10)
+    ax1.set_ylabel(count_col, fontsize=10, color="skyblue")
+    ax1.set_xticks(list(x_pos))
+    ax1.set_xticklabels(d[x_col].values, rotation=45, ha="right")
+    ax1.tick_params(axis="y", labelcolor="skyblue")
+    ax1.spines["top"].set_visible(False)
+
+    if salary_col:
+        salary_vals = pd.to_numeric(d[salary_col], errors="coerce").fillna(0).values.astype(float)
+        ax2 = ax1.twinx()
+        ax2.plot(list(x_pos), salary_vals, color="coral", marker="o", linewidth=2, markersize=6, label=salary_col)
+        ax2.set_ylabel(salary_col, fontsize=10, color="coral")
+        ax2.tick_params(axis="y", labelcolor="coral")
+        ax2.spines["top"].set_visible(False)
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper left", fontsize=9)
+    else:
+        ax1.legend(fontsize=9)
+
+    ax1.set_title(title, fontsize=12, fontweight="bold")
+    fig.tight_layout()
+    return fig
+
+
+def draw_pure_trend(df: pd.DataFrame, columns: list, title: str):
+    x_col = columns[0]
+    d = df.sort_values(x_col).copy()
+    d[x_col] = d[x_col].astype(str)
+
+    colors = ["#4C78A8", "#E45756", "#72B7B2", "#F58518", "#54A24B"]
+    numeric_cols = [c for c in columns[1:] if pd.api.types.is_numeric_dtype(df[c])]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    for i, y_col in enumerate(numeric_cols):
+        vals = pd.to_numeric(d[y_col], errors="coerce").fillna(0).values.astype(float)
+        ax.plot(d[x_col].values, vals, marker="o", linewidth=2, markersize=6,
+                color=colors[i % len(colors)], label=y_col)
+    if len(numeric_cols) > 1:
+        ax.legend(fontsize=9)
+    ax.set_xlabel(x_col, fontsize=10)
+    ax.set_ylabel(numeric_cols[0] if numeric_cols else "", fontsize=10)
+    ax.set_title(title, fontsize=12, fontweight="bold")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    plt.xticks(rotation=45, ha="right")
+    fig.tight_layout()
+    return fig
+
+
+def draw_categorical_bar(df: pd.DataFrame, columns: list, title: str, chart_type: str):
+    x_col = columns[0]
+    d = df.head(25).copy()
+    d[x_col] = d[x_col].astype(str).str[:30]
+    numeric_cols = [c for c in columns[1:] if pd.api.types.is_numeric_dtype(df[c])]
+
+    if chart_type == "pie" and len(numeric_cols) == 1 and len(d) <= 10:
+        fig, ax = plt.subplots(figsize=(8, 8))
+        vals = pd.to_numeric(d[numeric_cols[0]], errors="coerce").fillna(0).values.astype(float)
+        colors_set3 = plt.cm.Set3([i / len(d) for i in range(len(d))])
+        wedges, texts, autotexts = ax.pie(
+            vals, labels=d[x_col].values, autopct="%1.1f%%",
+            startangle=90, colors=colors_set3, pctdistance=0.85
+        )
+        for t in texts:
+            t.set_fontsize(9)
+        for t in autotexts:
+            t.set_fontsize(8)
+        ax.set_title(title, fontsize=12, fontweight="bold", pad=20)
+        fig.tight_layout()
+        return fig
+
+    y_col = numeric_cols[0] if numeric_cols else columns[1]
+    vals = pd.to_numeric(d[y_col], errors="coerce").fillna(0).values.astype(float)
+
+    fig, ax = plt.subplots(figsize=(10, max(4, len(d) * 0.4)))
+    colors = plt.cm.viridis([i / len(d) for i in range(len(d))])
+    ax.barh(d[x_col].values, vals, color=colors)
+    ax.set_xlabel(y_col, fontsize=10)
+    ax.set_title(title, fontsize=12, fontweight="bold")
+    ax.invert_yaxis()
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    fig.tight_layout()
+    return fig
+
+
 def render_chart(chart_type: str, columns: list, rows: list, title: str, sql: str = ""):
     if not rows or not columns:
         return
-    plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "WenQuanYi Micro Hei", "DejaVu Sans"]
-    plt.rcParams["axes.unicode_minus"] = False
+    plt.close("all")
+    _setup_font()
     df = pd.DataFrame(rows, columns=columns)
 
     fig = None
 
-    if chart_type == "bar" and len(columns) >= 2:
-        fig, ax = plt.subplots(figsize=(10, max(4, len(rows) * 0.4)))
-        x_col, y_col = columns[0], columns[1]
-        try:
-            df[y_col] = pd.to_numeric(df[y_col])
-        except (ValueError, TypeError):
-            pass
-        d = df.head(25).copy()
-        d[x_col] = d[x_col].astype(str).str[:30]
-        colors = plt.cm.viridis([i / len(d) for i in range(len(d))])
-        ax.barh(d[x_col], d[y_col], color=colors)
-        ax.set_xlabel(y_col, fontsize=10)
-        ax.set_title(title, fontsize=12, fontweight="bold")
-        ax.invert_yaxis()
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
+    if chart_type == "dual_axis" and len(columns) >= 3:
+        fig = draw_dual_axis_trend(df, columns, title)
 
-    elif chart_type == "pie" and len(columns) >= 2:
-        fig, ax = plt.subplots(figsize=(8, 8))
-        x_col, y_col = columns[0], columns[1]
-        try:
-            df[y_col] = pd.to_numeric(df[y_col])
-        except (ValueError, TypeError):
-            pass
-        d = df.head(10).copy()
-        colors = plt.cm.Set3([i / len(d) for i in range(len(d))])
-        wedges, texts, autotexts = ax.pie(
-            d[y_col], labels=d[x_col], autopct="%1.1f%%",
-            startangle=90, colors=colors, pctdistance=0.85
-        )
-        for text in texts:
-            text.set_fontsize(9)
-        for autotext in autotexts:
-            autotext.set_fontsize(8)
-        ax.set_title(title, fontsize=12, fontweight="bold", pad=20)
+    elif chart_type == "trend" and len(columns) >= 2:
+        fig = draw_pure_trend(df, columns, title)
 
-    elif chart_type == "line" and len(columns) >= 2:
-        x_col = columns[0]
-        d = df.head(30).copy()
-        d[x_col] = d[x_col].astype(str).str[:20]
-        colors = ["#4C78A8", "#E45756", "#72B7B2", "#F58518", "#54A24B"]
-        numeric_cols = []
-        for c in columns[1:]:
-            try:
-                d[c] = pd.to_numeric(d[c])
-                numeric_cols.append(c)
-            except (ValueError, TypeError):
-                pass
-
-        if len(numeric_cols) < 1:
-            pass
-        else:
-            col_ranges = {}
-            for c in numeric_cols:
-                col_ranges[c] = d[c].max() - d[c].min() if len(d) > 1 else d[c].max()
-
-            max_range = max(col_ranges.values()) if col_ranges else 1
-            has_mixed = any(v < max_range * 0.05 for v in col_ranges.values()) and len(numeric_cols) > 1
-
-            is_temporal = any(kw in sql.upper() for kw in ["YEAR", "MONTH", "POSTING_YEAR", "POSTING_MONTH"])
-
-            if has_mixed and len(numeric_cols) >= 2:
-                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
-                salary_keywords = ["salary", "compensation", "pay", "wage", "income", "earn"]
-                salary_cols = [c for c in numeric_cols if any(k in c.lower() for k in salary_keywords)]
-                count_cols = [c for c in numeric_cols if c not in salary_cols]
-
-                if not salary_cols:
-                    sorted_by_range = sorted(numeric_cols, key=lambda c: col_ranges[c], reverse=True)
-                    salary_cols = [sorted_by_range[0]]
-                    count_cols = [c for c in numeric_cols if c not in salary_cols]
-
-                demand_keywords = ["count", "job", "demand", "opening", "posting", "number"]
-                demand_cols = [c for c in count_cols if any(k in c.lower() for k in demand_keywords)] or count_cols
-                other_cols = [c for c in count_cols if c not in demand_cols]
-
-                for i, c in enumerate(demand_cols + other_cols):
-                    color = colors[i % len(colors)]
-                    ax1.plot(d[x_col], d[c], marker="o", linewidth=2, markersize=6, color=color, label=c)
-                ax1.set_title("Demand / Volume", fontsize=11, fontweight="bold")
-                ax1.set_xlabel(x_col, fontsize=9)
-                ax1.legend(fontsize=8)
-                ax1.spines["top"].set_visible(False)
-                ax1.spines["right"].set_visible(False)
-                ax1.tick_params(axis="x", rotation=45)
-
-                for i, c in enumerate(salary_cols):
-                    color = colors[(len(demand_cols) + other_cols + i) % len(colors)]
-                    ax2.plot(d[x_col], d[c], marker="o", linewidth=2, markersize=6, color=color, label=c)
-                ax2.set_title("Salary / Compensation", fontsize=11, fontweight="bold")
-                ax2.set_xlabel(x_col, fontsize=9)
-                ax2.legend(fontsize=8)
-                ax2.spines["top"].set_visible(False)
-                ax2.spines["right"].set_visible(False)
-                ax2.tick_params(axis="x", rotation=45)
-
-                fig.suptitle(title, fontsize=12, fontweight="bold", y=1.02)
-
-            elif is_temporal and len(numeric_cols) == 1:
-                fig, ax = plt.subplots(figsize=(10, 5))
-                y_col = numeric_cols[0]
-                ax.plot(d[x_col], d[y_col], marker="o", linewidth=2, markersize=6, color=colors[0])
-                ax.fill_between(range(len(d)), d[y_col], alpha=0.1, color=colors[0])
-                ax.set_xlabel(x_col, fontsize=10)
-                ax.set_ylabel(y_col, fontsize=10)
-                ax.set_title(title, fontsize=12, fontweight="bold")
-                ax.spines["top"].set_visible(False)
-                ax.spines["right"].set_visible(False)
-                plt.xticks(rotation=45, ha="right")
-
-            elif not is_temporal and len(numeric_cols) >= 1 and len(d) <= 15:
-                fig, ax = plt.subplots(figsize=(10, max(4, len(d) * 0.5)))
-                n_groups = len(d)
-                n_metrics = len(numeric_cols)
-                bar_width = 0.8 / max(n_metrics, 1)
-                x_pos = range(n_groups)
-
-                for i, y_col in enumerate(numeric_cols):
-                    offset = (i - n_metrics / 2 + 0.5) * bar_width
-                    bars = ax.barh(
-                        [p + offset for p in x_pos],
-                        d[y_col],
-                        height=bar_width,
-                        color=colors[i % len(colors)],
-                        label=y_col,
-                    )
-
-                ax.set_yticks(list(x_pos))
-                ax.set_yticklabels(d[x_col].astype(str).str[:25])
-                ax.set_title(title, fontsize=12, fontweight="bold")
-                ax.legend(fontsize=9)
-                ax.invert_yaxis()
-                ax.spines["top"].set_visible(False)
-                ax.spines["right"].set_visible(False)
-
-            else:
-                fig, ax = plt.subplots(figsize=(10, 5))
-                for i, y_col in enumerate(numeric_cols):
-                    color = colors[i % len(colors)]
-                    ax.plot(d[x_col], d[y_col], marker="o", linewidth=2, markersize=6, color=color, label=y_col)
-                if len(numeric_cols) > 1:
-                    ax.legend(fontsize=9)
-                ax.set_xlabel(x_col, fontsize=10)
-                ax.set_ylabel(numeric_cols[0] if numeric_cols else "", fontsize=10)
-                ax.set_title(title, fontsize=12, fontweight="bold")
-                ax.spines["top"].set_visible(False)
-                ax.spines["right"].set_visible(False)
-                plt.xticks(rotation=45, ha="right")
+    elif chart_type in ("bar", "pie") and len(columns) >= 2:
+        fig = draw_categorical_bar(df, columns, title, chart_type)
 
     elif chart_type == "scatter" and len(columns) >= 2:
-        fig, ax = plt.subplots(figsize=(8, 6))
         x_col, y_col = columns[0], columns[1]
-        try:
-            df[x_col] = pd.to_numeric(df[x_col])
-            df[y_col] = pd.to_numeric(df[y_col])
-        except (ValueError, TypeError):
-            pass
         d = df.head(50).copy()
-        ax.scatter(d[x_col], d[y_col], alpha=0.6, s=50, c="#4C78A8", edgecolors="white", linewidth=0.5)
+        d[x_col] = pd.to_numeric(d[x_col], errors="coerce")
+        d[y_col] = pd.to_numeric(d[y_col], errors="coerce")
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.scatter(d[x_col].values, d[y_col].values, alpha=0.6, s=50, c="#4C78A8", edgecolors="white", linewidth=0.5)
         ax.set_xlabel(x_col, fontsize=10)
         ax.set_ylabel(y_col, fontsize=10)
         ax.set_title(title, fontsize=12, fontweight="bold")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
+        fig.tight_layout()
 
     if fig:
-        plt.tight_layout()
         st.pyplot(fig)
         plt.close(fig)
 
