@@ -22,3 +22,5 @@ outputs/
 
 # Large model files
 *.gguf
+
+.agents/
