@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Data Ingestion: Load AI Jobs Market 2025-2026 CSV into SQLite."""
 
+import argparse
+import shutil
 import sqlite3
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +12,23 @@ import pandas as pd
 CSV_PATH = Path(__file__).parent.parent / "data" / "ai_jobs_market_2025_2026.csv"
 DB_DIR = Path(__file__).parent.parent / "db"
 DB_PATH = DB_DIR / "ai_jobs.db"
+
+
+def database_has_data(db_path: Path = DB_PATH) -> bool:
+    """Return True when the existing SQLite database already has job rows."""
+    if not db_path.exists():
+        return False
+    try:
+        conn = sqlite3.connect(str(db_path))
+        count = conn.execute("SELECT COUNT(*) FROM job_postings").fetchone()[0]
+        return count > 0
+    except sqlite3.Error:
+        return False
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -185,8 +205,13 @@ def populate_skills(conn: sqlite3.Connection, df: pd.DataFrame):
     print(f"Inserted {len(skills_data)} skill records")
 
 
-def build_database():
+def build_database(force: bool = False):
     """Main entry point: read CSV, clean, load into SQLite."""
+    if database_has_data(DB_PATH) and not force:
+        print(f"Database already initialized with data. Skipping full recreation: {DB_PATH}")
+        print("Use --force to rebuild from CSV.")
+        return
+
     if not CSV_PATH.exists():
         print(f"ERROR: CSV not found at {CSV_PATH}")
         print("Run: kaggle datasets download -d alitaqishah/ai-jobs-market-2025-2026-salaries -p data --unzip")
@@ -199,10 +224,11 @@ def build_database():
     df = clean_dataframe(df)
 
     DB_DIR.mkdir(parents=True, exist_ok=True)
-    if DB_PATH.exists():
-        DB_PATH.unlink()
+    temp_db = Path(tempfile.gettempdir()) / f"{DB_PATH.stem}.building{DB_PATH.suffix}"
+    if temp_db.exists():
+        temp_db.unlink()
 
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(temp_db))
     create_tables(conn)
 
     # Insert main job postings
@@ -231,7 +257,12 @@ def build_database():
     print(f"{'='*50}")
 
     conn.close()
+    shutil.copy2(temp_db, DB_PATH)
+    temp_db.unlink()
 
 
 if __name__ == "__main__":
-    build_database()
+    parser = argparse.ArgumentParser(description="Build the AI jobs SQLite database from CSV.")
+    parser.add_argument("--force", action="store_true", help="Rebuild the database even if it already has data.")
+    args = parser.parse_args()
+    build_database(force=args.force)

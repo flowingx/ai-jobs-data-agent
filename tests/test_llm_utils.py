@@ -5,7 +5,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from scripts.llm_utils import clean_llm_output, extract_sql, MAX_SQL_LENGTH, MAX_OR_CHAINS
+from scripts.llm_utils import (
+    clean_llm_output,
+    extract_sql,
+    generate_sql_with_llm,
+    validate_readonly_sql,
+    MAX_SQL_LENGTH,
+    MAX_OR_CHAINS,
+)
+
+
+class FailingLLM:
+    def invoke(self, messages):
+        raise AssertionError("LLM should not be called for a deterministic known query")
 
 
 class TestCleanLlmOutput(unittest.TestCase):
@@ -108,6 +120,51 @@ SELECT city, COUNT(*) FROM job_postings GROUP BY city
 
 Let me know if you need anything else."""
         self.assertEqual(extract_sql(text), "SELECT city, COUNT(*) FROM job_postings GROUP BY city")
+
+
+class TestValidateReadonlySql(unittest.TestCase):
+    def test_allows_select(self):
+        validate_readonly_sql("SELECT skill FROM job_skills LIMIT 5")
+
+    def test_allows_with_select(self):
+        validate_readonly_sql("WITH top_skills AS (SELECT skill FROM job_skills) SELECT * FROM top_skills")
+
+    def test_rejects_write_keywords(self):
+        bad_sql = [
+            "DROP TABLE job_postings",
+            "UPDATE job_postings SET annual_salary_usd = 0",
+            "INSERT INTO job_skills(job_id, skill) VALUES ('1', 'Python')",
+            "DELETE FROM job_skills",
+            "CREATE TABLE x(id int)",
+            "PRAGMA writable_schema=ON",
+        ]
+        for sql in bad_sql:
+            with self.subTest(sql=sql):
+                with self.assertRaises(ValueError):
+                    validate_readonly_sql(sql)
+
+    def test_rejects_multiple_statements(self):
+        with self.assertRaises(ValueError):
+            validate_readonly_sql("SELECT * FROM job_postings; SELECT * FROM job_skills")
+
+    def test_rejects_with_write_statement(self):
+        with self.assertRaises(ValueError):
+            validate_readonly_sql("WITH x AS (SELECT 1) UPDATE job_postings SET annual_salary_usd = 0")
+
+
+class TestKnownQuestionSql(unittest.TestCase):
+    def test_remote_vs_onsite_salary_uses_text_work_type_values(self):
+        sql = generate_sql_with_llm(FailingLLM(), "远程与现场 AI 岗位的平均薪资分别是多少？")
+        self.assertIn("remote_work IN ('Fully Remote', 'Hybrid')", sql)
+        self.assertIn("GROUP BY", sql.upper())
+        self.assertNotIn("remote_work = 1", sql)
+
+    def test_cuda_python_year_comparison_uses_year_then_skill(self):
+        sql = generate_sql_with_llm(FailingLLM(), "对比 CUDA 和 Python 在不同年份的岗位数量和平均薪资")
+        self.assertIn('jp.posting_year AS "Year"', sql)
+        self.assertIn('js.skill AS "Skill"', sql)
+        self.assertIn("LOWER(js.skill) IN ('cuda', 'python')", sql)
+        self.assertLess(sql.index('jp.posting_year AS "Year"'), sql.index('js.skill AS "Skill"'))
 
 
 if __name__ == "__main__":

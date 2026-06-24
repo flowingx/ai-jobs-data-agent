@@ -10,7 +10,8 @@
 - AI 摘要生成
 - 1,500 条真实 AI 岗位数据（Kaggle 来源）
 - 8 个预置查询示例（直接执行，不依赖 LLM）
-- SQL 防幻觉机制（OR 链截断、长度限制）
+- SQL 防幻觉机制（只读校验、OR 链截断、长度限制）
+- 高频展示问题使用确定性 SQL，避免远程岗位、技能年份对比等语义漂移
 
 ## 快速开始
 
@@ -23,10 +24,13 @@ cp .env.example .env
 # 编辑 .env，填入 DeepSeek API Key
 
 # 3. 初始化数据库
-python3 scripts/init_db.py
+python scripts/init_db.py
 
 # 4. 启动
 streamlit run app.py
+
+# 5. 测试
+python -m unittest discover tests -v
 ```
 
 打开 `http://localhost:8501`。
@@ -89,7 +93,7 @@ python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
 ├── requirements.txt      # Python 依赖
 ├── app.py                # Streamlit Web UI
 ├── data/
-│   ├── ai_jobs_market_2025_2026.csv
+│   ├── ai_jobs_market_2025_2026.csv  # 课程提交包包含；缺失时可按下方命令下载
 │   └── charts/
 ├── db/
 │   └── ai_jobs.db        # SQLite 数据库（可重新生成）
@@ -99,7 +103,11 @@ python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
 │   ├── data_agent.py     # CLI Agent（带重试）
 │   └── init_db.py        # 数据导入
 └── tests/
-    └── test_llm_utils.py # 单元测试（21 项）
+    ├── test_llm_utils.py        # LLM 输出解析、SQL 只读校验与高频问题 SQL
+    ├── test_init_db.py          # 数据库初始化幂等性
+    ├── test_execute_sql_safety.py # execute_sql 只读执行安全
+    ├── test_docs_consistency.py # 文档一致性验证
+    └── test_app_preset_queries.py # 预置查询、数据浏览查询与图表策略验证
 ```
 
 ## 数据库结构
@@ -116,7 +124,44 @@ python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
 
 - `job_skills.skill`：独立行存储（每行一个技能）
 - `job_postings.required_skills`：管道符分隔（如 `Python|SQL|Cloud`）
+- `job_postings.remote_work`：文本字段，取值为 `Fully Remote`、`Hybrid`、`On-site`
 - 搜索时统一使用 `LOWER(col) LIKE LOWER('%keyword%')` 忽略大小写
+- “远程 vs 现场”薪资对比中，`Fully Remote` 与 `Hybrid` 会归为 `Remote`，再与 `On-site` 对比
+
+## 查询与安全策略
+
+- 运行 SQL 前会先做只读校验，拒绝 `DROP`、`UPDATE`、`PRAGMA` 等危险语句。
+- SQLite 执行连接使用只读 URI（`mode=ro`），并设置 `PRAGMA query_only=ON`。
+- LLM 输出会先清洗 markdown、注释和 `<think>` 内容，再提取 SQL。
+- CUDA/Python 年份对比、远程/现场平均薪资等课程展示高频问题使用确定性 SQL，减少模型生成差异。
+
+## 数据集与提交包注意事项
+
+- 课程提交包中包含 `data/ai_jobs_market_2025_2026.csv`，用于离线复现。
+- 如果 CSV 缺失，可运行：
+  ```bash
+  kaggle datasets download -d alitaqishah/ai-jobs-market-2025-2026-salaries -p data --unzip
+  ```
+- `scripts/init_db.py` 默认检测到已有数据库后跳过重建；需要强制重建时运行：
+  ```bash
+  python scripts/init_db.py --force
+  ```
+- 打包 RAR 时不要包含 `.env`，只保留 `.env.example`，避免泄露 API Key。
+
+## 最终提交清单
+
+建议包含：
+- 源码：`app.py`、`scripts/`、`tests/`
+- 文档：`README.md`、`AGENTS.md`、`db/ER_DIAGRAM.md`
+- 数据：`data/ai_jobs_market_2025_2026.csv`
+- 报告：`实验报告_数据分析智能体.docx`
+- 环境模板：`.env.example`
+
+不要包含：
+- `.env`
+- `.venv/`、`venv/`
+- `__pycache__/`
+- 临时日志和 IDE 本地配置文件
 
 ## License
 

@@ -9,10 +9,10 @@ Streamlit app that converts natural language to SQL queries against an SQLite da
 ```bash
 pip install -r requirements.txt
 cp .env.example .env   # then set DEEPSEEK_API_KEY
-python3 scripts/init_db.py   # requires data/ai_jobs_market_2025_2026.csv
+python scripts/init_db.py   # requires data/ai_jobs_market_2025_2026.csv
 ```
 
-The CSV is from Kaggle — not checked in. If missing, download:
+The CSV is from Kaggle and is included in the course submission package for reproducibility. If missing, download:
 ```bash
 kaggle datasets download -d alitaqishah/ai-jobs-market-2025-2026-salaries -p data --unzip
 ```
@@ -34,7 +34,7 @@ data_agent.py (CLI) ─┘
 
 - `app.py` = full web UI with tabs (Smart Query, Data Browser, Preset Analysis)
 - `scripts/data_agent.py` = CLI version with retry logic
-- `scripts/init_db.py` = CSV → SQLite ingestion (destructive: deletes and rebuilds DB)
+- `scripts/init_db.py` = CSV → SQLite ingestion (idempotent by default; use `--force` to rebuild)
 
 ## Database
 
@@ -48,7 +48,7 @@ SQLite at `db/ai_jobs.db`. Tables:
 - **No lint, no typecheck** — this repo has zero CI or validation tooling
 - **No OpenAI key needed** — it uses DeepSeek API via `langchain-openai` (compatible OpenAI SDK). The env var `DEEPSEEK_API_KEY` is what matters, not `OPENAI_API_KEY`
 - **LLM output parsing** — `extract_sql()` strips markdown fences, comments, and truncates long OR chains. Any SQL modification should preserve these anti-hallucination guards
-- **`init_db.py` is destructive** — it deletes and rebuilds `ai_jobs.db` from scratch
+- **`init_db.py` is idempotent by default** — it skips rebuild when `ai_jobs.db` already has data; use `--force` for a full rebuild
 - **Local GPU mode** requires a separate llama-server process (see README for exact command)
 - **Shared code** — `scripts/llm_utils.py` is the single source of truth for LLM/SQL logic. Changes to SQL rules or LLM config go there only
 
@@ -58,7 +58,8 @@ SQLite at `db/ai_jobs.db`. Tables:
 - `.env` loaded via `python-dotenv` at module top-level
 - LangChain `ChatOpenAI` with `temperature=0`, `max_tokens=1024`
 - Charts via matplotlib (Agg backend), rendered through Streamlit
-- All SQL is SELECT-only, enforced both in prompt and at runtime (OR chain truncation, length limit)
+- All SQL is SELECT-only, enforced both in prompt and at runtime (`validate_readonly_sql`, OR chain truncation, length limit)
+- Do not include `.env` in the final RAR submission; submit `.env.example` only.
 - Unit tests: `python3 -m unittest discover tests/ -v`
 
 ## Existing docs

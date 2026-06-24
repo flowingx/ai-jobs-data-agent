@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Generate the course experiment report as a Word document."""
 
+from pathlib import Path
+
 from docx import Document
 from docx.shared import Pt, Cm, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -128,8 +130,8 @@ features = [
     "三模版自适应可视化：双轴趋势图、纯时间线图、分类柱状图，自动匹配最优图表",
     "AI 分析摘要：每次查询后由大模型生成中文商业分析结论",
     "预置分析模板：提供 8 个一键执行的预设查询，覆盖薪资、技能、市场等维度",
-    "双层语义防火墙：LLM 输出解析 + 运行时 SQL 关键字拦截，双重保障数据库安全",
-    "21 项自动化单元测试：确保核心解析函数 100% 回归安全",
+    "只读 SQL 防护：LLM 输出解析 + 运行时只读校验，拒绝写入和结构修改语句",
+    "自动化测试：覆盖 SQL 输出解析、只读校验、幂等建库和预置查询",
 ]
 for f in features:
     doc.add_paragraph(f, style="List Bullet")
@@ -163,10 +165,11 @@ add_table(
     ],
 )
 
-doc.add_heading("2.3 智能建库、防重复 I/O 与自适应幂等性保障", level=2)
+doc.add_heading("2.3 幂等建库与强制重建机制", level=2)
 add_body(
-    '系统对关系数据库的初始化脚本 scripts/init_db.py 进行了全方位的工业级硬化设计，'
-    '抛弃了传统"盲目删库重建"的高能耗、高风险方案，实现了基于状态检测的自适应增量幂等性底座。'
+    "系统对关系数据库初始化脚本 scripts/init_db.py 增加了状态检测。"
+    "默认情况下，如果 db/ai_jobs.db 已存在且 job_postings 表中已有数据，脚本会跳过重建，"
+    "避免开发和演示过程中反复写入数据库。"
 )
 
 add_body("（1）原子化状态校验：")
@@ -177,15 +180,15 @@ add_body(
 
 add_body("（2）防重复写盘与自愈保护：")
 add_body(
-    '当检测到数据库已初始化且数据完备时，系统会自动终止后续的高密集型 CSV 解析与写盘操作，'
+    '当检测到数据库已初始化且数据完备时，系统会跳过后续 CSV 解析和写盘操作，'
     '输出提示："Database already initialized with data. Skipping full recreation." 并安全退出。'
-    '这在频繁重启开发环境或多用户并发部署时，彻底杜绝了重复 I/O 导致的磁盘磨损与数据二次污染。'
+    "如果需要重新从 CSV 构建数据库，可以使用 --force 参数显式重建。"
 )
 
-add_body("（3）带后门的安全覆写机制（--force）：")
+add_body("（3）强制重建机制（--force）：")
 add_body(
-    '为了同时满足"生产环境防误删"与"开发环境重洗数据"的双重需求，脚本引入了命令行参数解析器。'
-    '只有当显式传入 --force 标志时，系统才会执行全量擦除重建，完美兼顾了自动化部署的安全性与调试的灵活性。'
+    "为了在需要更新数据或重新生成索引时保留调试入口，脚本提供 --force 参数。"
+    "只有显式传入该参数时，系统才会重新读取 CSV 并覆盖生成 db/ai_jobs.db。"
 )
 doc.add_page_break()
 
@@ -239,7 +242,7 @@ add_code_block(
     "Database created: db/ai_jobs.db\n"
     "  Job postings: 1500\n"
     "  Skill records: 9548\n"
-    "  Unique skills: 218\n"
+    "  Unique skills: 93\n"
     "=================================================="
 )
 doc.add_page_break()
@@ -315,14 +318,14 @@ steps = [
 for i, s in enumerate(steps, 1):
     doc.add_paragraph(f"{i}. {s}")
 
-doc.add_heading("4.5 双层语义防火墙与运行时沙箱机制", level=2)
+doc.add_heading("4.5 SQL 输出解析与运行时只读校验", level=2)
 add_body(
-    "为防止 LLM 生成危险或无效的 SQL，系统设计了双层防护架构。第一层为语义层防火墙，"
-    "通过精心设计的提示词约束和后处理逻辑，在 LLM 输出阶段拦截问题 SQL；第二层为运行时沙箱，"
-    "在 SQL 实际执行前进行关键字黑名单扫描，确保即使绕过第一层防护的破坏性语句也无法到达数据库引擎。"
+    "为防止 LLM 生成危险或无效的 SQL，系统在提示词、输出解析和运行时执行前都增加了限制。"
+    "提示词要求模型只输出 SELECT 查询；extract_sql 函数负责清理 Markdown、注释和超长 SQL；"
+    "validate_readonly_sql 函数在真正执行前检查 SQL 类型和危险关键字。"
 )
 
-doc.add_heading("4.5.1 第一层：语义层防火墙", level=3)
+doc.add_heading("4.5.1 输出解析阶段", level=3)
 add_body("在 LLM 输出解析阶段（extract_sql 函数），实施以下防护措施：")
 guards1 = [
     "提示词约束：SQL_RULES 明确要求只生成 SELECT 查询，禁止 CREATE/DROP/ALTER/INSERT/UPDATE/DELETE",
@@ -335,22 +338,18 @@ guards1 = [
 for g in guards1:
     doc.add_paragraph(g, style="List Bullet")
 
-doc.add_heading("4.5.2 第二层：运行时 SQL 关键字拦截", level=3)
+doc.add_heading("4.5.2 运行时只读校验", level=3)
 add_body(
-    "在 SQL 实际执行前，系统对 LLM 生成的 SQL 语句进行二次扫描。通过硬编码的关键字黑名单列表，"
-    "拦截所有可能造成数据破坏的 DDL 和 DML 操作。黑名单包含以下高危关键字："
+    "在 SQL 实际执行前，系统调用 validate_readonly_sql 进行二次检查。"
+    "校验规则包括：SQL 不能为空；只允许单条语句；首个关键字必须为 SELECT 或 WITH；"
+    "同时拒绝所有可能造成数据写入或结构修改的关键字。"
 )
 add_code_block(
-    'SQL_KEYWORD_BLACKLIST = [\n'
-    '    "DROP", "DELETE", "UPDATE", "INSERT",\n'
-    '    "ALTER", "RENAME", "GRANT", "SHUTDOWN"\n'
-    ']'
+    'FORBIDDEN_SQL_PATTERN = r"ALTER|ATTACH|CREATE|DELETE|DETACH|DROP|INSERT|PRAGMA|REINDEX|REPLACE|UPDATE|VACUUM"'
 )
 add_body(
-    "拦截逻辑在 execute_sql 函数执行前触发：若 SQL 语句中包含黑名单中的任一关键字（不区分大小写），"
-    "系统立即拒绝执行并返回安全警告，确保数据库不会受到任何写入或结构修改操作的影响。"
-    "这一机制构成了系统的运行时安全沙箱，即使 LLM 因提示注入或模型幻觉生成了破坏性语句，"
-    "也无法绕过该层防护。"
+    "校验逻辑在 app.py 和 scripts/data_agent.py 的 execute_sql 函数中统一调用。"
+    "执行连接会通过 SQLite 只读 URI（mode=ro）打开数据库，并设置 PRAGMA query_only=ON，进一步降低误写数据库的风险。"
 )
 
 doc.add_heading("4.6 错误自修复与重试机制", level=2)
@@ -405,10 +404,11 @@ doc.add_heading("5.3 远程 vs 现场岗位对比", level=2)
 add_body("问题：远程岗位和现场岗位的数量和薪资差异如何？")
 add_body("生成的 SQL：")
 add_code_block(
-    'SELECT CASE WHEN remote_work = 1 THEN "Remote" ELSE "On-site" END AS "Work Type", \n'
+    'SELECT remote_work AS "Work Type", \n'
     '       COUNT(*) AS "Count" \n'
     'FROM job_postings \n'
-    'GROUP BY remote_work'
+    'GROUP BY remote_work \n'
+    'ORDER BY COUNT(*) DESC'
 )
 add_body("【此处插入运行截图】")
 
@@ -447,19 +447,19 @@ doc.add_page_break()
 doc.add_heading("六、可视化展示", level=1)
 add_body(
     "本系统使用 Matplotlib 实现数据可视化，通过 Streamlit 的 st.pyplot() 渲染到 Web 界面。"
-    "可视化引擎采用三模版硬化路由架构（Three-Template Hardened Architecture），摒弃了传统的"
+    "可视化引擎采用三类图表路由，摒弃了传统的"
     "动态条件嵌套逻辑，转而使用三个独立的、经过充分测试的图表模板函数，根据数据特征自动路由到"
     "最合适的模板。"
 )
 
-doc.add_heading("6.1 三模版硬化路由架构", level=2)
+doc.add_heading("6.1 图表类型分流", level=2)
 add_body(
     "早期版本的可视化引擎采用高度动态化的条件判断逻辑，根据 SQL 结构和数据特征动态选择图表类型。"
     "然而，这种设计在面对复杂多列数据时频繁出现类型错误（如 int + list 运算）和尺度不匹配问题"
     "（如将 200,000+ 的薪资与 50 的岗位数量绘制在同一 Y 轴上，导致小数值被压平为零）。"
 )
 add_body(
-    "经过重构，我们设计了三模版硬化路由架构，将可视化逻辑拆分为三个独立的、类型安全的模板函数，"
+    "经过重构，我们设计了三类可视化模板，将可视化逻辑拆分为三个独立的、类型安全的模板函数，"
     "每个模板内部使用显式类型转换（.astype(float) / .values）确保数值安全。路由逻辑如下："
 )
 
@@ -611,7 +611,7 @@ steps = [
     "安装依赖：pip install -r requirements.txt",
     "配置环境变量：cp .env.example .env，然后编辑 .env 填入 DeepSeek API Key",
     "初始化数据库：python3 scripts/init_db.py（需确保 data/ 目录下有 CSV 文件）",
-    "运行单元测试：python3 -m unittest discover tests/ -v（确认 21 项测试全部通过）",
+    "运行单元测试：python3 -m unittest discover tests/ -v（确认全部测试通过）",
     "启动 Web UI：streamlit run app.py，打开 http://localhost:8501",
     "在 Smart Query 标签页输入自然语言问题进行查询",
 ]
@@ -623,7 +623,7 @@ add_body("可通过以下 SQL 验证数据导入成功：")
 add_code_block(
     "SELECT COUNT(*) FROM job_postings;       -- 应返回 1500\n"
     "SELECT COUNT(*) FROM job_skills;          -- 应返回约 9548\n"
-    "SELECT COUNT(DISTINCT skill) FROM job_skills;  -- 应返回约 218"
+    "SELECT COUNT(DISTINCT skill) FROM job_skills;  -- 应返回约 93"
 )
 doc.add_page_break()
 
@@ -634,7 +634,7 @@ doc.add_heading("九、自动化单元测试与健壮性保障", level=1)
 
 doc.add_heading("9.1 测试框架选型", level=2)
 add_body(
-    "本项目采用 Python 标准库 unittest 作为测试框架，测试文件位于 tests/test_llm_utils.py。"
+    "本项目采用 Python 标准库 unittest 作为测试框架，测试文件位于 tests/ 目录。"
     "选择 unittest 而非 pytest 的理由是：unittest 为 Python 内置模块，无需额外安装第三方依赖，"
     "降低了项目的环境依赖复杂度，符合课程作业的可复现性要求。"
 )
@@ -642,9 +642,8 @@ add_body("运行命令：python3 -m unittest discover tests/ -v")
 
 doc.add_heading("9.2 测试覆盖范围", level=2)
 add_body(
-    "测试套件包含 21 项自动化测试用例，覆盖 scripts/llm_utils.py 中的两个核心纯函数："
-    "clean_llm_output 和 extract_sql。这两个函数是 LLM 输出处理管道的关键环节，"
-    "任何回归缺陷都可能导致 SQL 解析失败或安全防护失效。"
+    "测试套件覆盖 LLM 输出处理、SQL 只读校验、数据库初始化和预置查询。"
+    "这些测试分别对应智能体的 SQL 生成链路、运行时安全边界、数据导入复现能力和页面分析案例。"
 )
 
 doc.add_heading("9.2.1 clean_llm_output 测试（7 项）", level=3)
@@ -663,8 +662,8 @@ add_table(
     ],
 )
 
-doc.add_heading("9.2.2 extract_sql 测试（14 项）", level=3)
-add_body("该函数负责从 LLM 输出中提取纯净 SQL，测试用例覆盖以下场景：")
+doc.add_heading("9.2.2 extract_sql 与 validate_readonly_sql 测试", level=3)
+add_body("相关函数负责从 LLM 输出中提取纯净 SQL，并在执行前拒绝非只读语句，测试用例覆盖以下场景：")
 
 add_table(
     ["测试场景", "用例数", "覆盖内容"],
@@ -679,35 +678,28 @@ add_table(
         ["空输入处理", "1", "空字符串返回空字符串"],
         ["噪声文本过滤", "1", "SQL 前的自然语言描述被跳过"],
         ["Markdown + 周围文本", "1", "SQL 代码块夹在自然语言中间"],
+        ["只读 SQL 放行", "2", "SELECT 和 WITH SELECT 可以执行"],
+        ["危险 SQL 拒绝", "多项", "DROP/UPDATE/INSERT/DELETE/CREATE/PRAGMA 等写入或结构修改语句会被拒绝"],
+        ["多语句拒绝", "1", "包含多个 SQL 语句时拒绝执行"],
     ],
 )
 
+doc.add_heading("9.2.3 建库与预置查询测试", level=3)
+add_body(
+    "tests/test_init_db.py 验证 scripts/init_db.py 的幂等行为和 --force 重建行为；"
+    "tests/test_app_preset_queries.py 验证 Streamlit 页面中的预置 SQL 可以在当前 SQLite 数据库上执行并返回结果。"
+)
+
 doc.add_heading("9.3 测试执行结果", level=2)
-add_body("所有 21 项测试用例均通过，执行耗时约 0.002 秒：")
+add_body("全部测试用例均通过，当前测试覆盖范围如下：")
 add_code_block(
-    "test_strips_think_tags ............... ok\n"
-    "test_strips_unclosed_think_tag ....... ok\n"
-    "test_strips_multiple_think_blocks .... ok\n"
-    "test_plain_text_unchanged ............ ok\n"
-    "test_strips_leading_trailing_ws ...... ok\n"
-    "test_unclosed_think_consumes_remain .. ok\n"
-    "test_strips_opening_think_tag ........ ok\n"
-    "test_markdown_fenced ................. ok\n"
-    "test_markdown_fenced_no_lang ......... ok\n"
-    "test_plain_select .................... ok\n"
-    "test_plain_with_keyword .............. ok\n"
-    "test_strips_single_line_comment ...... ok\n"
-    "test_strips_block_comment ............ ok\n"
-    "test_strips_think_and_extracts_sql ... ok\n"
-    "test_strips_trailing_semicolon ....... ok\n"
-    "test_truncates_long_or_chain ......... ok\n"
-    "test_long_or_chain_preserved ......... ok\n"
-    "test_truncates_long_sql .............. ok\n"
-    "test_empty_input_returns_empty ....... ok\n"
-    "test_noise_before_select ............. ok\n"
-    "test_markdown_with_surrounding_text .. ok\n"
-    "--------------------------------------------------\n"
-    "Ran 21 tests in 0.002s  OK"
+    "LLM 输出清洗与 SQL 提取：覆盖 think 标签、Markdown 代码块、注释清除、OR 链截断和长度限制\n"
+    "SQL 只读校验：覆盖 SELECT/WITH 放行、危险关键词拒绝和多语句拒绝\n"
+    "execute_sql 执行安全：覆盖执行前校验、SQLite 只读 URI（mode=ro）和 PRAGMA query_only=ON\n"
+    "数据库初始化：覆盖已有数据跳过重建，以及 --force 强制重建\n"
+    "预置查询：覆盖 Streamlit 示例 SQL 可执行并返回结果\n"
+    "文档一致性：覆盖 ER 图关系、.env 打包提醒、remote_work 文本语义和报告措辞\n"
+    "命令：python -m unittest discover tests -v"
 )
 
 doc.add_heading("9.4 测试保障的意义", level=2)
@@ -731,11 +723,11 @@ add_body(
 )
 add_body(
     "项目的主要技术亮点包括：\n"
-    "（1）双层语义防火墙：通过提示词约束 + 运行时关键字拦截，双重保障数据库安全；\n"
-    "（2）三模版硬化可视化：双轴趋势图、纯时间线图、分类柱状图，自动匹配最优图表；\n"
+    "（1）只读 SQL 防护：通过提示词约束、输出解析和运行时只读校验，降低误写数据库风险；\n"
+    "（2）三类可视化模板：双轴趋势图、纯时间线图、分类柱状图，自动匹配最优图表；\n"
     "（3）错误自修复：SQL 执行失败后自动将错误信息反馈给 LLM，支持最多 3 次重试；\n"
     "（4）中心化工具层：将共享逻辑抽取到 llm_utils.py，消除 50% 代码重复；\n"
-    "（5）自动化测试：21 项单元测试覆盖核心解析函数，确保回归安全。"
+    "（5）自动化测试：覆盖核心解析函数、只读 SQL 校验、建库流程和预置查询，确保回归安全。"
 )
 doc.add_page_break()
 
@@ -752,7 +744,7 @@ add_table(
         ["scripts/llm_utils.py", "共享 LLM/SQL 工具函数（中心化工具层）"],
         ["scripts/data_agent.py", "CLI 版数据智能体"],
         ["scripts/init_db.py", "数据导入与建库脚本"],
-        ["tests/test_llm_utils.py", "单元测试（21 项）"],
+        ["tests/", "自动化测试（SQL 解析、只读校验、建库和预置查询）"],
         ["requirements.txt", "Python 依赖清单"],
         [".env.example", "环境变量模板"],
         ["data/ai_jobs_market_2025_2026.csv", "原始数据集"],
@@ -804,6 +796,6 @@ enforce_dual_font(doc)
 # ============================================================
 # 保存
 # ============================================================
-output_path = "/home/flow/ai-jobs-data-agent/实验报告_数据分析智能体.docx"
+output_path = Path(__file__).parent / "实验报告_数据分析智能体.docx"
 doc.save(output_path)
 print(f"Report saved: {output_path}")

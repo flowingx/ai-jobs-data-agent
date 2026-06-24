@@ -58,7 +58,7 @@ erDiagram
     }
 
     job_postings ||--o{ job_skills : "has many skills"
-    job_postings ||--o{ job_categories : "aggregated by category"
-    job_postings ||--o{ experience_levels : "aggregated by experience"
-    job_postings ||--o{ location_summary : "aggregated by location"
+
+    %% job_categories, experience_levels, and location_summary are derived summary tables.
+    %% They are regenerated from job_postings and do not have foreign-key relationships.
 ```

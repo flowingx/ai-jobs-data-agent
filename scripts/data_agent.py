@@ -4,11 +4,13 @@
 import json
 import os
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.llm_utils import (
     clean_llm_output,
@@ -16,6 +18,7 @@ from scripts.llm_utils import (
     get_llm,
     generate_sql_with_llm,
     summarize_with_llm,
+    validate_readonly_sql,
 )
 
 DB_PATH = Path(__file__).parent.parent / "db" / "ai_jobs.db"
@@ -24,8 +27,12 @@ MAX_RETRIES = 3
 
 
 def execute_sql(sql: str) -> tuple[list, list, Optional[str]]:
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = None
     try:
+        validate_readonly_sql(sql)
+        db_uri = f"file:{DB_PATH.resolve().as_posix()}?mode=ro"
+        conn = sqlite3.connect(db_uri, uri=True)
+        conn.execute("PRAGMA query_only=ON")
         cursor = conn.execute(sql)
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
         rows = cursor.fetchall()
@@ -33,7 +40,8 @@ def execute_sql(sql: str) -> tuple[list, list, Optional[str]]:
     except Exception as e:
         return [], [], str(e)
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 def query_agent(question: str, engine: str = "deepseek", verbose: bool = True) -> dict:

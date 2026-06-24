@@ -87,13 +87,18 @@ def generate_mermaid(schema: dict) -> str:
 
     relations = [
         ("job_postings", "1", "--", "o{", "job_skills", "has many skills"),
-        ("job_postings", "1", "--", "o{", "job_categories", "aggregated by category"),
-        ("job_postings", "1", "--", "o{", "experience_levels", "aggregated by experience"),
-        ("job_postings", "1", "--", "o{", "location_summary", "aggregated by location"),
     ]
 
     for src, c1, line, c2, dst, label in relations:
         lines.append(f"    {src} ||{line}{c2} {dst} : \"{label}\"")
+
+    lines.extend(
+        [
+            "",
+            "    %% job_categories, experience_levels, and location_summary are derived summary tables.",
+            "    %% They are regenerated from job_postings and do not have foreign-key relationships.",
+        ]
+    )
 
     return "\n".join(lines)
 
