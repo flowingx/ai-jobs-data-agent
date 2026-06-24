@@ -148,21 +148,6 @@ python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
   ```
 - 打包 RAR 时不要包含 `.env`，只保留 `.env.example`，避免泄露 API Key。
 
-## 最终提交清单
-
-建议包含：
-- 源码：`app.py`、`scripts/`、`tests/`
-- 文档：`README.md`、`AGENTS.md`、`db/ER_DIAGRAM.md`
-- 数据：`data/ai_jobs_market_2025_2026.csv`
-- 报告：`实验报告_数据分析智能体.docx`
-- 环境模板：`.env.example`
-
-不要包含：
-- `.env`
-- `.venv/`、`venv/`
-- `__pycache__/`
-- 临时日志和 IDE 本地配置文件
-
 ## License
 
 Apache 2.0 - Copyright 2026 flowingx
