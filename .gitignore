@@ -24,3 +24,9 @@ outputs/
 *.gguf
 
 .agents/
+
+# Local report generation files
+generate_report.py
+实验报告_数据分析智能体.docx
+~.docx
+
