@@ -5,6 +5,7 @@
 ## 功能
 
 - 自然语言 SQL 查询（支持中英文）
+- LangChain SQLDatabase 连接数据库并动态读取表结构
 - 双引擎：DeepSeek（云端）或本地 GPU（llama.cpp）
 - 多种图表：柱状图、饼图、折线图、散点图
 - AI 摘要生成
@@ -90,10 +91,12 @@ python3 scripts/data_agent.py -q "What are the top 5 skills?" -e local
 ├── AGENTS.md             # AI Agent 工作指南
 ├── LICENSE               # Apache 2.0
 ├── README.md             # 本文件
-├── requirements.txt      # Python 依赖
+├── requirements.txt      # Python 依赖（已用 == 锁定版本）
+├── 软件版本号.txt         # 软件/库版本清单（提交要求）
 ├── app.py                # Streamlit Web UI
 ├── data/
-│   ├── ai_jobs_market_2025_2026.csv  # 课程提交包包含；缺失时可按下方命令下载
+│   ├── ai_jobs_market_2025_2026.csv  # 原始数据；课程提交包包含，缺失时可按下方命令下载
+│   ├── ai_jobs_market_cleaned.csv    # 清洗后数据（由 init_db.py 生成）
 │   └── charts/
 ├── db/
 │   └── ai_jobs.db        # SQLite 数据库（可重新生成）

@@ -31,11 +31,38 @@ def database_has_data(db_path: Path = DB_PATH) -> bool:
             pass
 
 
+def inspect_dataframe(df: pd.DataFrame) -> None:
+    """Print field names, dtypes and a missing-value report for the raw data.
+
+    Covers the assignment's preprocessing checks: inspect column names/types and
+    report missing values (with the handling strategy applied in clean_dataframe).
+    """
+    print("\n--- Field names and types (raw CSV) ---")
+    for col, dtype in df.dtypes.items():
+        print(f"  {col}: {dtype}")
+
+    print("\n--- Missing-value report (raw CSV) ---")
+    missing = df.isnull().sum()
+    missing = missing[missing > 0]
+    if missing.empty:
+        print("  No missing values detected.")
+    else:
+        total = len(df)
+        for col, count in missing.items():
+            print(f"  {col}: {count} missing ({count / total:.1%})")
+        print("  Handling: numeric -> 0, categorical -> 'Unknown', skills -> '' (see clean_dataframe).")
+
+
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Clean the raw CSV data for database ingestion."""
 
+    # Inspect field names/types and report missing values before any imputation
+    inspect_dataframe(df)
+
     # Drop duplicates
+    before = len(df)
     df = df.drop_duplicates()
+    print(f"\nDropped {before - len(df)} duplicate rows")
 
     # Handle missing salaries - fill with 0 and mark
     salary_cols = ["annual_salary_usd", "salary_min_usd", "salary_max_usd"]
@@ -222,6 +249,12 @@ def build_database(force: bool = False):
     print(f"Raw rows: {len(df)}")
 
     df = clean_dataframe(df)
+
+    # Persist the cleaned dataset as CSV for reproducibility / inspection.
+    # Derived from CSV_PATH so unit tests (which patch CSV_PATH) stay isolated.
+    cleaned_csv = CSV_PATH.parent / "ai_jobs_market_cleaned.csv"
+    df.to_csv(cleaned_csv, index=False, encoding="utf-8-sig")
+    print(f"Cleaned CSV written: {cleaned_csv}")
 
     DB_DIR.mkdir(parents=True, exist_ok=True)
     temp_db = Path(tempfile.gettempdir()) / f"{DB_PATH.stem}.building{DB_PATH.suffix}"

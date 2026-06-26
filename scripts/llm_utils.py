@@ -2,11 +2,15 @@
 
 import os
 import re
+from pathlib import Path
 from typing import Optional
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
+DEFAULT_DB_PATH = Path(__file__).parent.parent / "db" / "ai_jobs.db"
+
+# Static fallback used only when the live database cannot be reached.
 SCHEMA_HINT = """Tables and columns:
 
 job_postings: job_id, job_title, job_category, experience_level, years_of_experience, education_required, annual_salary_usd, salary_min_usd, salary_max_usd, city, country, remote_work, company_size, industry, required_skills, ai_salary_premium_pct, demand_score, demand_growth_yoy_pct, benefits_score_10, posting_year, posting_month, is_senior, is_remote_friendly, is_llm_role, salary_tier
@@ -116,6 +120,42 @@ def get_llm(engine: str = "deepseek"):
         )
 
 
+_DB_CACHE: dict = {}
+
+
+def get_database(db_path=None):
+    """Connect to the SQLite database through LangChain's SQLDatabase wrapper.
+
+    This is the single point where LangChain owns the database connection, so the
+    agent's "connect to DB / read schema" capability is provided by LangChain
+    rather than raw sqlite3. Read-only query execution still goes through the
+    hardened sqlite3 path in execute_sql() for safety.
+    """
+    from langchain_community.utilities import SQLDatabase
+
+    path = Path(db_path) if db_path else DEFAULT_DB_PATH
+    key = str(path.resolve())
+    if key not in _DB_CACHE:
+        _DB_CACHE[key] = SQLDatabase.from_uri(
+            f"sqlite:///{path.as_posix()}",
+            sample_rows_in_table_info=0,
+        )
+    return _DB_CACHE[key]
+
+
+def get_schema_hint(db_path=None) -> str:
+    """Return the live database schema read via LangChain, falling back to the
+    static SCHEMA_HINT when the database is unavailable (e.g. during unit tests)."""
+    try:
+        db = get_database(db_path)
+        table_info = db.get_table_info()
+        if table_info and table_info.strip():
+            return "Database schema (read live via LangChain SQLDatabase):\n\n" + table_info
+    except Exception:
+        pass
+    return SCHEMA_HINT
+
+
 def known_question_sql(question: str) -> Optional[str]:
     """Return deterministic SQL for common demo questions that need exact semantics."""
     q = question.lower()
@@ -154,14 +194,15 @@ ORDER BY jp.posting_year, js.skill"""
     return None
 
 
-def generate_sql_with_llm(llm, question: str, error_hint: str = "") -> str:
+def generate_sql_with_llm(llm, question: str, error_hint: str = "", schema: Optional[str] = None) -> str:
     known_sql = known_question_sql(question)
     if known_sql:
         return known_sql
 
+    schema_text = schema if schema is not None else get_schema_hint()
     error_section = f"\nPrevious SQL failed: {error_hint}\nGenerate a DIFFERENT valid SQL query." if error_hint else ""
     messages = [
-        SystemMessage(content=f"You are a SQLite expert.\n\n{SCHEMA_HINT}\n\n{SQL_RULES}\n{error_section}"),
+        SystemMessage(content=f"You are a SQLite expert.\n\n{schema_text}\n\n{SQL_RULES}\n{error_section}"),
         HumanMessage(content=f"Question: {question}")
     ]
     response = llm.invoke(messages)
